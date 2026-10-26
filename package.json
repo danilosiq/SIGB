@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/vercel-prepare.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -14,7 +14,8 @@
     "worker": "tsx --env-file-if-exists=.env.local scripts/worker.ts",
     "test:integration": "tsx scripts/integration.ts",
     "format": "prettier --write .",
-    "test:api": "node scripts/api-integration.mjs"
+    "test:api": "node scripts/api-integration.mjs",
+    "db:check": "node scripts/check-database.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

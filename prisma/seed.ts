@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { db } from "../src/core/services/server/db";
 import { readFile } from "node:fs/promises";
 import { demoBooks } from "../src/core/features/library/data/demo";
 import { hashPassword } from "../src/core/services/server/security";
-const db = new PrismaClient();
 async function main() {
   const password = process.env.SEED_ADMIN_PASSWORD;
   if (!password || password.length < 10)

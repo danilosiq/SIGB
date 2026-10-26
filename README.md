@@ -1,12 +1,12 @@
 # SIGB — Sistema Integrado de Gestão Bibliotecária
 
-Aplicação Next.js com TypeScript, Tailwind CSS, TanStack Query, Axios, Lucide e Prisma/PostgreSQL, preparada para o Neon. Criada em `SIGB`, seguindo a organização modular do `dicere-speech-frontend`.
+Aplicação Next.js com TypeScript, Tailwind CSS, TanStack Query, Axios, Lucide e Prisma/PostgreSQL, compatível com Postgres fornecido pela integração da Vercel. Criada em `SIGB`, seguindo a organização modular do `dicere-speech-frontend`.
 
 ## Situação da entrega
 
 - A demonstração local funciona sem banco, tem dados ilustrativos, alternância de perfil e **não grava operações**.
 - A API real, migrações, autenticação, acervo e serviço assíncrono estão implementados.
-- A conexão na sua conta Neon e os envios reais dependem de `DATABASE_URL` e de provedores configurados. Nenhuma conta Neon foi criada e nenhuma mensagem real foi enviada.
+- A conexão utiliza as variáveis da integração Postgres do projeto Vercel. Os envios reais continuam dependendo de provedores configurados; nenhuma mensagem real é enviada pelo processo de configuração.
 
 ## Arquitetura
 
@@ -30,11 +30,17 @@ scripts/worker.ts                Fila persistente e manutenção periódica
 
 Axios é chamado somente pelos serviços, sem acesso direto nos componentes. As permissões são verificadas no servidor; a alternância de perfil existe apenas na demonstração. O banco nunca é acessado pelo navegador.
 
-## Banco Neon e configuração
+## Postgres da Vercel e configuração
 
-Crie um projeto PostgreSQL no [Neon](https://console.neon.tech) e copie a connection string com TLS, preferencialmente a opção com pooling para a aplicação. Consulte a [documentação de conexão](https://neon.com/docs/get-started/connect-neon).
+O projeto [sigb](https://sigb-three.vercel.app) está ligado ao [repositório SIGB](https://github.com/danilosiq/SIGB). As credenciais fornecidas pela integração da Vercel permanecem nas variáveis protegidas do projeto.
 
-Copie `.env.example` para `.env.local` e preencha `DATABASE_URL`. A aplicação e os scripts usam essa variável; não há credenciais embutidas. A migração é versionada em `prisma/migrations`, sem `db push` em produção.
+O Prisma reconhece, por ordem, `DATABASE_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING` e `DATABASE_URL_UNPOOLED`. Não é necessário duplicar as variáveis fornecidas pela integração. Se houver `DIRECT_URL`, `POSTGRES_URL_NON_POOLING` ou `DATABASE_URL_UNPOOLED`, a migração usa essa conexão direta, enquanto a aplicação preserva a conexão principal com pooling.
+
+No build da Vercel (`VERCEL=1`), o SIGB aplica apenas as migrações pendentes e testa a conexão antes de gerar o build Next.js. Não executa reset, não apaga dados e não cria usuários automaticamente. Uma falha interrompe o deploy. Builds locais continuam funcionando sem acesso ao banco.
+
+`GET /api/health` verifica a conexão e a existência do schema, retornando somente estado de disponibilidade, sem dados do acervo ou credenciais. A resposta `{"status":"ok","database":"connected"}` confirma o acesso real.
+
+Para desenvolvimento local, use uma conexão disponibilizada para o ambiente Development em `.env.local`, que é ignorado pelo Git. Credenciais da Vercel marcadas como sensíveis podem não ser exportáveis; isso não impede o funcionamento no deploy. A migração é versionada em `prisma/migrations`, sem `db push` em produção.
 
 Os comandos já estão preparados:
 
@@ -43,6 +49,7 @@ Os comandos já estão preparados:
 | `npm run dev`              | Desenvolvimento local                                                 |
 | `npm run build`            | Gerar Prisma Client e build de produção                               |
 | `npm run start`            | Servir o build                                                        |
+| `npm run db:check`         | Verificar conexão sem mostrar credenciais                             |
 | `npm run db:migrate`       | Aplicar migrações no banco configurado                                |
 | `npm run db:seed`          | Administrador inicial e oito livros                                   |
 | `npm run worker`           | Consumir fila, atualizar multas, bloquear atrasos e gerar lembretes   |

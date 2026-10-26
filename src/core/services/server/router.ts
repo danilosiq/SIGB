@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z, ZodError } from "zod";
 import { db } from "./db";
+import { databaseUrl } from "./database-env.mjs";
 import {
   HttpError,
   currentUser,
@@ -36,16 +37,27 @@ export async function handle(req: Request, segments: string[]) {
       checkOrigin(req);
     if (resource === "config" && method === "GET")
       return json({
-        demo: !process.env.DATABASE_URL,
+        demo: !databaseUrl(),
         policy: {
           loanDays: Number(process.env.LOAN_DAYS) || 14,
           dailyFineCents: Number(process.env.DAILY_FINE_CENTS) || 100,
         },
       });
-    if (!process.env.DATABASE_URL)
+    if (resource === "health" && method === "GET") {
+      if (!databaseUrl())
+        return json({ status: "unavailable", database: "not_configured" }, 503);
+      try {
+        await db.$queryRaw`SELECT 1`;
+        await db.book.count();
+        return json({ status: "ok", database: "connected" });
+      } catch {
+        return json({ status: "unavailable", database: "unavailable" }, 503);
+      }
+    }
+    if (!databaseUrl())
       throw new HttpError(
         503,
-        "Conecte o Neon em DATABASE_URL para usar os dados reais.",
+        "A conexão com o banco de dados ainda não está configurada.",
       );
     if (resource === "auth") {
       if (id === "me" && method === "GET") {
