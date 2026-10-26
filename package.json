@@ -1,0 +1,45 @@
+{
+  "name": "sigb",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "tsx --env-file-if-exists=.env.local prisma/seed.ts",
+    "worker": "tsx --env-file-if-exists=.env.local scripts/worker.ts",
+    "test:integration": "tsx scripts/integration.ts",
+    "format": "prettier --write .",
+    "test:api": "node scripts/api-integration.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "@tanstack/react-query": "^5.101.2",
+    "axios": "^1.18.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.22.0",
+    "next": "16.4.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "prettier": "^3.9.10",
+    "prisma": "^6.19.0",
+    "tailwindcss": "^4.3.2",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  }
+}

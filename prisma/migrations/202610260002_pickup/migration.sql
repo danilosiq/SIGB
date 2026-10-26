@@ -1,0 +1,1 @@
+ALTER TABLE "Loan" ADD COLUMN "pickupAt" TIMESTAMP(3), ADD COLUMN "pickupConfirmedAt" TIMESTAMP(3);

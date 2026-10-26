@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+ ADMIN
+ ALUNO
+ BIBLIOTECARIO
+}
+enum Channel {
+ EMAIL
+ SMS
+ WHATSAPP
+}
+enum NotificationStatus {
+ PROCESSANDO
+ ENVIADA
+ FALHA
+}
+model User {
+ id String @id @default(uuid()) @db.Uuid
+ name String
+ email String @unique
+ passwordHash String
+ phone String?
+ role Role @default(ALUNO)
+ blocked Boolean @default(false)
+ deletedAt DateTime?
+ createdAt DateTime @default(now())
+ loans Loan[]
+ sessions Session[]
+ deliveries Delivery[]
+}
+model Session {
+ id String @id
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id])
+ expiresAt DateTime
+ @@index([expiresAt])
+}
+model LoginAttempt {
+ key String @id
+ attempts Int @default(0)
+ resetAt DateTime
+}
+model Book {
+ id String @id @default(uuid()) @db.Uuid
+ title String
+ author String
+ isbn String @unique
+ category String
+ description String
+ publisher String
+ year Int
+ pages Int
+ available Boolean @default(true)
+ deletedAt DateTime?
+ createdAt DateTime @default(now())
+ cover Cover?
+ loans Loan[]
+}
+model Cover {
+ bookId String @id @db.Uuid
+ book Book @relation(fields:[bookId],references:[id])
+ mime String
+ data Bytes
+}
+model Loan {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id])
+ bookId String @db.Uuid
+ book Book @relation(fields:[bookId],references:[id])
+ borrowedAt DateTime @default(now())
+ dueAt DateTime
+ pickupAt DateTime?
+ pickupConfirmedAt DateTime?
+ returnedAt DateTime?
+ fineCents Int @default(0)
+ renewals Int @default(0)
+ @@index([userId,returnedAt])
+ @@index([dueAt,returnedAt])
+}
+model Notification {
+ id String @id @default(uuid()) @db.Uuid
+ eventKey String @unique
+ type String
+ message String
+ status NotificationStatus @default(PROCESSANDO)
+ createdAt DateTime @default(now())
+ deliveries Delivery[]
+}
+model Delivery {
+ id String @id @default(uuid()) @db.Uuid
+ notificationId String @db.Uuid
+ notification Notification @relation(fields:[notificationId],references:[id])
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id])
+ channel Channel
+ destination String
+ status NotificationStatus @default(PROCESSANDO)
+ attempts Int @default(0)
+ nextAttemptAt DateTime @default(now())
+ lockedUntil DateTime?
+ leaseToken String?
+ lastError String?
+ @@unique([notificationId,userId,channel])
+ @@index([status,nextAttemptAt])
+}
+model Audit {
+ id String @id @default(uuid()) @db.Uuid
+ actorId String?
+ action String
+ entityId String
+ details Json
+ createdAt DateTime @default(now())
+ @@index([entityId,createdAt])
+}
