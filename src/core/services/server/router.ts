@@ -17,6 +17,7 @@ import {
   publicUser,
 } from "./security";
 import {
+  registrationSchema,
   bookSchema,
   userSchema,
   profileSchema,
@@ -25,6 +26,7 @@ import {
 } from "./validation";
 import { borrow, changeLoan } from "./loans";
 import { enqueueEvent } from "./notifications";
+import { limitRegistrations, registerStudent } from "./registration";
 import { fineAt } from "../../utils/rules";
 const staff = ["ADMIN", "BIBLIOTECARIO"] as const;
 const json = (data: unknown, status = 200) =>
@@ -60,6 +62,38 @@ export async function handle(req: Request, segments: string[]) {
         "A conexão com o banco de dados ainda não está configurada.",
       );
     if (resource === "auth") {
+      if (id === "register" && method === "POST") {
+        const input = registrationSchema.parse(await req.json());
+        const address = (
+          req.headers.get("x-vercel-forwarded-for") ??
+          req.headers.get("x-forwarded-for") ??
+          "local"
+        )
+          .split(",")[0]
+          .trim()
+          .slice(0, 128);
+        await limitRegistrations(address);
+        const result = await registerStudent(input).catch((error: unknown) => {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          )
+            throw new HttpError(
+              409,
+              "Este e-mail já possui cadastro. Entre na sua conta.",
+            );
+          throw error;
+        });
+        (await cookies()).set("sigb-session", result.token, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          expires: result.expiresAt,
+        });
+        return json(publicUser(result.user), 201);
+      }
+
       if (id === "me" && method === "GET") {
         const u = await currentUser();
         return json(u ? publicUser(u) : null);

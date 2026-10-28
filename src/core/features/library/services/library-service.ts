@@ -11,6 +11,12 @@ export const libraryService = {
   me: async () => (await api.get<User | null>("/auth/me")).data,
   login: async (input: { email: string; password: string }) =>
     (await api.post<User>("/auth/login", input)).data,
+  register: async (input: {
+    name: string;
+    phone: string;
+    email: string;
+    password: string;
+  }) => (await api.post<User>("/auth/register", input)).data,
   logout: async () => {
     await api.post("/auth/logout");
   },

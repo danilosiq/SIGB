@@ -58,7 +58,7 @@ Os comandos já estão preparados:
 | `npm run test:api`         | Testes HTTP contra uma instância local de teste (`SIGB_TEST_API_URL`) |
 | `npm run typecheck`        | Validação TypeScript                                                  |
 
-Antes do seed, defina `SEED_ADMIN_PASSWORD` com pelo menos 10 caracteres; `SEED_ADMIN_EMAIL` é opcional (padrão `admin@sigb.local`). O seed não redefine a senha de um administrador existente. Cadastre alunos e bibliotecários pela interface administrativa. A senha inicial de cada usuário é informada pelo administrador; recuperação de senha e cadastro público não foram solicitados e não estão disponíveis.
+Antes do seed, defina `SEED_ADMIN_PASSWORD` com pelo menos 10 caracteres; `SEED_ADMIN_EMAIL` é opcional (padrão `admin@sigb.local`). O seed não redefine a senha de um administrador existente. Cadastre alunos e bibliotecários pela interface administrativa. A senha inicial de cada usuário é informada pelo administrador; o cadastro público de alunos está disponível na tela inicial, em “Cadastre-se”. Recuperação de senha não está disponível.
 
 O serviço web e o worker devem permanecer ativos em produção. Execute o worker como processo separado supervisionado (por exemplo, serviço do provedor de hospedagem). A recepção do webhook apenas persiste o evento e retorna; não depende de manter uma requisição HTTP aberta. O worker verifica manutenção a cada minuto e consome a fila continuamente. Vários workers são compatíveis com o bloqueio de linhas `FOR UPDATE SKIP LOCKED`.
 
@@ -176,3 +176,9 @@ Build de produção, TypeScript, testes unitários e integração com PostgreSQL
 Para repetir a integração, aplique as migrações em um banco descartável chamado `sigb_test` e defina `SIGB_TEST_DATABASE_URL` para esse banco. O teste cria dados, não apaga tabelas e se recusa a executar sem essa variável/nome. O teste de gateway usa uma resposta local simulada e não transmite mensagens.
 
 As telas foram verificadas no navegador, incluindo busca, detalhes do livro, bloqueio de gravação na demonstração e acesso à gestão de usuários pelo perfil administrador.
+
+## Cadastro público e identidade visual
+
+A opção “Cadastre-se” solicita nome completo, telefone, e-mail e senha. `POST /api/auth/register` valida os quatro campos, normaliza o e-mail, cria exclusivamente um usuário `ALUNO` e inicia sua sessão. Conta, sessão e auditoria são persistidas na mesma transação. Perfis administrativos não podem ser solicitados pelo cadastro público. E-mails duplicados retornam 409; o envio é limitado a dez tentativas válidas por endereço de origem a cada 15 minutos. A senha deve ter entre 10 e 128 caracteres, conforme a política adotada para novos usuários.
+
+A marca SIGB é um monograma vetorial próprio: duas faixas entrelaçadas formam a letra S, com referências a páginas e dobras. Os arquivos editáveis ficam em `public/brand/sigb-mark.svg` e `public/brand/sigb-logo.svg`. A assinatura é usada no acesso, na navegação, no carregamento e no favicon, sem usar ícones de catálogo como logo.

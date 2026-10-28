@@ -37,3 +37,34 @@ export const notificationSchema = z.object({
     .max(3),
   recipientIds: z.array(uuid).min(1).max(100),
 });
+
+export const registrationSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(3, "Informe seu nome completo.")
+      .max(100)
+      .regex(/^\S+(?:\s+\S+)+$/, "Informe nome e sobrenome."),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^\+?[0-9 ()-]{8,20}$/, "Informe um telefone válido.")
+      .refine(
+        (v) =>
+          v.replace(/\D/g, "").length >= 8 && v.replace(/\D/g, "").length <= 15,
+        "Informe um telefone válido.",
+      ),
+    email: z
+      .string()
+      .trim()
+      .max(200)
+      .pipe(z.email("Informe um e-mail válido."))
+      .transform((v) => v.toLowerCase()),
+    password: z
+      .string()
+      .min(10, "A senha deve ter ao menos 10 caracteres.")
+      .max(128),
+  })
+  .strict();
+export type RegistrationInput = z.infer<typeof registrationSchema>;

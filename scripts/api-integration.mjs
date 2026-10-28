@@ -36,6 +36,50 @@ async function login(email, password) {
   return r.cookie;
 }
 const password = "TestOnly-User-2026";
+const registration = {
+  name: "Aluno Cadastro Público",
+  phone: "+5511999998888",
+  email: "signup-" + suffix + "@test.local",
+  password,
+};
+assert.equal(
+  (await call("/api/auth/register", "POST", { ...registration, role: "ADMIN" }))
+    .status,
+  400,
+);
+assert.equal(
+  (await call("/api/auth/register", "POST", { ...registration, phone: "" }))
+    .status,
+  400,
+);
+const signup = await call("/api/auth/register", "POST", registration);
+assert.equal(signup.status, 201, JSON.stringify(signup.data));
+assert.equal(signup.data.role, "ALUNO");
+assert.equal(signup.data.email, registration.email);
+assert.ok(signup.cookie);
+assert.equal("passwordHash" in signup.data, false);
+assert.equal("password" in signup.data, false);
+assert.equal(
+  (await call("/api/auth/me", "GET", undefined, signup.cookie)).data.id,
+  signup.data.id,
+);
+assert.equal(
+  (await call("/api/users", "GET", undefined, signup.cookie)).status,
+  403,
+);
+assert.equal(
+  (await call("/api/auth/register", "POST", registration)).status,
+  409,
+);
+assert.equal(
+  (await call("/api/auth/logout", "POST", undefined, signup.cookie)).status,
+  200,
+);
+const signupSession = await login(registration.email, password);
+assert.equal(
+  (await call("/api/auth/me", "GET", undefined, signupSession)).data.role,
+  "ALUNO",
+);
 const admin = await login("admin@sigb.local", "TestOnly-Admin-2026");
 assert.equal((await call("/api/users")).status, 401);
 const input = {
@@ -244,5 +288,5 @@ assert.equal(
   null,
 );
 console.info(
-  "API HTTP OK: login, sessões, permissões dos 3 perfis, proteção de origem, upload binário, empréstimo, agendamento, confirmação, renovação, devolução, exclusão lógica e webhook idempotente.",
+  "API HTTP OK: cadastro público, login automático, restrição de perfil, login, sessões, permissões dos 3 perfis, proteção de origem, upload binário, empréstimo, agendamento, confirmação, renovação, devolução, exclusão lógica e webhook idempotente.",
 );

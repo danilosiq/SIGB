@@ -109,20 +109,6 @@ button {
   letter-spacing: -1.7px;
   font-weight: 750;
 }
-.logo-icon {
-  width: 43px;
-  height: 43px;
-  border-radius: 13px;
-  background: #285c43;
-  color: #fff;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-}
-.brand-dot {
-  color: #91ad76;
-  margin-left: -8px;
-}
 .sidebar .brand {
   padding-left: 12px;
 }
@@ -2513,4 +2499,119 @@ td small {
   .book-category {
     font-size: 7px;
   }
+}
+/* Identidade SIGB: monograma desenhado em vetor, sem biblioteca de ícones. */
+.brand {
+  gap: 11px;
+  letter-spacing: -1.4px;
+}
+.brand > img,
+.brand-mark > img {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-weight: 750;
+}
+.brand-signature {
+  width: 5px;
+  height: 5px;
+  background: #aa9459;
+  display: inline-block;
+  margin-left: 1px;
+}
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.footer-brand > img {
+  width: 18px;
+  height: 18px;
+}
+.loading-page > .brand-mark > img {
+  width: 60px;
+  height: 60px;
+}
+.auth-mobile-brand {
+  display: none;
+}
+.auth-mode-switch {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #7d857e;
+  border-top: 1px solid #e4e9df;
+  padding-top: 23px;
+  margin-top: 26px;
+}
+.auth-mode-switch > button {
+  color: #285e44;
+  font-weight: 650;
+  padding: 5px;
+}
+.auth-mode-switch > button:hover {
+  text-decoration: underline;
+}
+.login-form > .auth-student-note {
+  font-size: 10px;
+  color: #889080;
+  text-align: center;
+  margin: 14px 0 0;
+  line-height: 1.6;
+}
+.auth-form {
+  gap: 16px;
+}
+.auth-form input {
+  font-size: 13px;
+  padding: 12px;
+}
+.auth-form label {
+  font-size: 12px;
+}
+.auth-form .button {
+  font-size: 12px;
+  padding: 13px 15px;
+}
+.auth-form small {
+  font-size: 10px;
+}
+.login-story .brand {
+  font-size: 36px;
+}
+.login-story .brand > img {
+  width: 52px;
+  height: 52px;
+}
+.login-form {
+  width: min(390px, 82%);
+}
+@media (max-width: 760px) {
+  .auth-mobile-brand {
+    display: flex;
+    margin-bottom: 38px;
+    font-size: 32px;
+  }
+  .login-form {
+    width: min(390px, calc(100% - 44px));
+    padding: 35px 0 45px;
+  }
+  .auth-mode-switch {
+    font-size: 12px;
+  }
+}
+
+.login-page {
+  --line: #e0e6dc;
+  --surface: #fff;
+  --text: #263d34;
+  --muted: #7d857e;
 }

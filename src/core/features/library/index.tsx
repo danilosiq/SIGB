@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   BookOpen,
   Library as LibraryIcon,
@@ -42,6 +42,8 @@ import { libraryService as service } from "./services/library-service";
 import { roles } from "./data/demo";
 import { BookForm } from "./components/book-form";
 import { UserForm } from "./components/user-form";
+import { Brand } from "@/core/components/brand";
+import { AuthScreen } from "./components/auth-screen";
 import { errorMessage } from "@/core/services/api-service";
 const date = (v: string) =>
   format(new Date(v), "dd MMM yyyy", { locale: ptBR });
@@ -101,8 +103,6 @@ export function Library() {
   } | null>(null);
   const [deadline, setDeadline] = useState<Loan | null>(null);
   const [appointment, setAppointment] = useState<Loan | null>(null);
-  const [loginError, setLoginError] = useState("");
-  const [logging, setLogging] = useState(false);
   useEffect(() => {
     if (selected || bookForm || userForm || confirm || deadline || appointment)
       setNotice("");
@@ -143,106 +143,16 @@ export function Library() {
     state.setDemoRole(role);
     navigate("catalog");
   }
-  async function login(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    setLogging(true);
-    setLoginError("");
-    try {
-      await service.login({
-        email: String(form.get("email")),
-        password: String(form.get("password")),
-      });
-      await state.client.invalidateQueries();
-    } catch (e) {
-      setLoginError(errorMessage(e));
-    } finally {
-      setLogging(false);
-    }
-  }
   if (state.loading)
     return (
       <div className="loading-page">
-        <div className="logo-icon">
-          <BookOpen />
-        </div>
+        <Brand markOnly />
         <h1>Sua biblioteca, mais perto.</h1>
         <LoaderCircle className="spin" />
         <p>Preparando o acervo…</p>
       </div>
     );
-  if (!user)
-    return (
-      <main className="login-page">
-        <div className="login-story">
-          <span className="brand">
-            <span className="logo-icon">
-              <BookOpen />
-            </span>
-            SIGB<span className="brand-dot">.</span>
-          </span>
-          <h1>
-            Um novo capítulo
-            <br />
-            começa por aqui.
-          </h1>
-          <p>
-            Seu próximo livro, uma nova ideia e um mundo inteiro de
-            possibilidades.
-          </p>
-          <div className="login-covers">
-            {["midnight", "habits", "casmurro"].map((c) => (
-              <img
-                key={c}
-                src={"/covers/" + c + ".svg"}
-                alt="Ilustração de capa de livro"
-              />
-            ))}
-          </div>
-          <small>SISTEMA INTEGRADO DE GESTÃO BIBLIOTECÁRIA</small>
-        </div>
-        <section className="login-form">
-          <span className="eyebrow">BEM-VINDO À BIBLIOTECA</span>
-          <h2>Bom ter você por aqui.</h2>
-          <p>Entre com sua conta para continuar a sua leitura.</p>
-          <form className="form" onSubmit={login}>
-            <label>
-              E-mail institucional
-              <input
-                name="email"
-                type="email"
-                placeholder="voce@universidade.edu.br"
-                autoComplete="email"
-                required
-              />
-            </label>
-            <label>
-              Senha
-              <input
-                name="password"
-                type="password"
-                placeholder="Sua senha"
-                autoComplete="current-password"
-                required
-                maxLength={128}
-              />
-            </label>
-            {(loginError || state.error) && (
-              <p role="alert" className="form-error">
-                {loginError || errorMessage(state.error)}
-              </p>
-            )}
-            <button className="button primary" disabled={logging}>
-              {logging ? "Entrando…" : "Entrar na biblioteca"}
-              <ArrowRight size={17} />
-            </button>
-          </form>
-          <small>
-            Precisa de acesso? Fale com a administração da biblioteca.
-          </small>
-        </section>
-      </main>
-    );
+  if (!user) return <AuthScreen error={state.error} />;
   const nav = [
     { id: "overview" as View, label: "Visão geral", icon: LayoutDashboard },
     { id: "catalog" as View, label: "Explorar acervo", icon: LibraryIcon },
@@ -266,11 +176,8 @@ export function Library() {
         />
       )}
       <aside className={"sidebar " + (mobile ? "open" : "")}>
-        <a href="/" className="brand">
-          <span className="logo-icon">
-            <BookOpen size={25} />
-          </span>
-          SIGB<span className="brand-dot">.</span>
+        <a href="/" aria-label="SIGB — início">
+          <Brand />
         </a>
         <span className="sidebar-caption">SUA BIBLIOTECA DIGITAL</span>
         <nav>
@@ -1125,7 +1032,7 @@ export function Library() {
           )}
           <footer className="main-footer">
             <span>
-              <BookOpen size={15} />
+              <Brand markOnly className="footer-brand" />
               SIGB <span>·</span> Conhecimento que conecta.
             </span>
             <span>
