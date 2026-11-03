@@ -13,6 +13,8 @@ export type Book = {
   author: string;
   isbn: string;
   category: string;
+  sector?: string | null;
+  shelf?: string | null;
   description: string;
   publisher: string;
   year: number;

@@ -21,6 +21,20 @@ export const bookSchema = z.object({
   author: z.string().trim().min(2).max(150),
   isbn: z.string().trim().min(5).max(32),
   category: z.string().min(2).max(60),
+  sector: z
+    .string()
+    .trim()
+    .max(80)
+    .nullable()
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
+  shelf: z
+    .string()
+    .trim()
+    .max(80)
+    .nullable()
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
   description: z.string().min(10).max(5000),
   publisher: z.string().min(2).max(120),
   year: z.coerce.number().int().min(1000).max(2100),

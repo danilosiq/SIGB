@@ -1,0 +1,1 @@
+ALTER TABLE "Book" ADD COLUMN "sector" TEXT, ADD COLUMN "shelf" TEXT;

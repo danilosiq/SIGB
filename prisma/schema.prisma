@@ -62,6 +62,8 @@ model Book {
   author      String
   isbn        String    @unique
   category    String
+  sector      String?
+  shelf       String?
   description String
   publisher   String
   year        Int

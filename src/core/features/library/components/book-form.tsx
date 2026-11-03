@@ -82,6 +82,24 @@ export function BookForm({
           </select>
         </label>
         <label>
+          Setor
+          <input
+            name="sector"
+            defaultValue={book?.sector ?? ""}
+            maxLength={80}
+            placeholder="Ex.: Literatura brasileira"
+          />
+        </label>
+        <label>
+          Prateleira
+          <input
+            name="shelf"
+            defaultValue={book?.shelf ?? ""}
+            maxLength={80}
+            placeholder="Ex.: A-03"
+          />
+        </label>
+        <label>
           Editora
           <input
             name="publisher"

@@ -134,6 +134,8 @@ const book = {
   author: "Autor de Teste",
   isbn: suffix.replaceAll("-", ""),
   category: "Ciência",
+  sector: "Ciências exatas",
+  shelf: "A-03",
   description: "Exemplar para teste de API",
   publisher: "SIGB",
   year: 2026,
@@ -159,6 +161,19 @@ assert.equal(
 const saved = await call("/api/books", "POST", book, staff);
 assert.equal(saved.status, 201);
 const bookId = saved.data.id;
+assert.equal(saved.data.sector, book.sector);
+assert.equal(saved.data.shelf, book.shelf);
+const relocated = await call(
+  "/api/books/" + bookId,
+  "PATCH",
+  { ...book, sector: "Referência", shelf: "B-12" },
+  staff,
+);
+assert.equal(relocated.status, 200);
+const reloaded = (await call("/api/books/" + bookId, "GET", undefined, staff))
+  .data[0];
+assert.equal(reloaded.sector, "Referência");
+assert.equal(reloaded.shelf, "B-12");
 assert.equal(
   (
     await call("/api/books", "POST", book, staff, {
