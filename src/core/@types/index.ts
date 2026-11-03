@@ -17,6 +17,9 @@ export type Book = {
   publisher: string;
   year: number;
   pages: number;
+  format?: string;
+  readingUrl?: string | null;
+  source?: string | null;
   available: boolean;
   coverUrl: string | null;
 };
@@ -40,6 +43,7 @@ export type Notification = {
   message: string;
   status: "PROCESSANDO" | "ENVIADA" | "FALHA";
   createdAt: string;
+  readAt: string | null;
   deliveries: {
     id: string;
     channel: string;
@@ -49,4 +53,10 @@ export type Notification = {
   }[];
 };
 export type View =
-  "catalog" | "overview" | "loans" | "users" | "notifications" | "profile";
+  | "catalog"
+  | "overview"
+  | "loans"
+  | "users"
+  | "notifications"
+  | "profile"
+  | "open-library";

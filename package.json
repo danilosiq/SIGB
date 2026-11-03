@@ -15,7 +15,9 @@
     "test:integration": "tsx scripts/integration.ts",
     "format": "prettier --write .",
     "test:api": "node scripts/api-integration.mjs",
-    "db:check": "node scripts/check-database.mjs"
+    "db:check": "node scripts/check-database.mjs",
+    "test:inbox": "tsx src/test/inbox-integration.ts",
+    "test:notification-timezone": "tsx src/test/notification-timezone.integration.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -26,7 +28,8 @@
     "next": "16.4.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "zod": "^4.4.3"
+    "workflow": "^5.3.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
@@ -41,6 +44,8 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "deepmerge-ts": "^8.0.0"
+    "deepmerge-ts": "^8.0.0",
+    "zod@<4.6.6": "4.6.7",
+    "undici@7.30.0": "7.30.1"
   }
 }

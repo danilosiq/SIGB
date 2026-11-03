@@ -1,0 +1,78 @@
+.otpIntroduction {
+  margin: 0 0 24px;
+  padding: 15px 17px;
+  border: 1px solid #dfe7d8;
+  border-radius: 8px;
+  background: #f0f5ec;
+  color: #50674d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.otpIntroduction strong {
+  color: #294e37;
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.codeInput {
+  text-align: center;
+  font-size: 28px !important;
+  letter-spacing: 0.42em;
+  font-variant-numeric: tabular-nums;
+  padding: 15px 15px 15px 26px !important;
+}
+.codeHelp {
+  line-height: 1.6;
+}
+.expiration {
+  color: #71826c;
+  font-size: 11px;
+  margin: -3px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.expired {
+  color: #9a5c42;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0;
+}
+.otpActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  margin-top: 22px;
+}
+.resendButton {
+  width: 100%;
+  padding: 11px 15px;
+  border: 1px solid #dfe7d8;
+  border-radius: 6px;
+  color: #285e44;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.resendButton:disabled {
+  opacity: 0.6;
+  color: #7a8674;
+}
+.backButton {
+  padding: 5px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #6e7e67;
+  font-size: 12px;
+}
+.backButton:hover,
+.resendButton:not(:disabled):hover {
+  background: #edf3e9;
+}
+.tip {
+  font-size: 11px;
+  color: #84907e;
+  margin: 20px 0 0;
+  line-height: 1.7;
+  text-align: center;
+}

@@ -19,14 +19,17 @@ import {
 import {
   registrationSchema,
   bookSchema,
+  digitalBookSchema,
   userSchema,
   profileSchema,
   uuid,
   notificationSchema,
 } from "./validation";
 import { borrow, changeLoan } from "./loans";
+import { dispatchNotification } from "./notification-dispatch";
 import { enqueueEvent } from "./notifications";
 import { limitRegistrations, registerStudent } from "./registration";
+import { searchOpenLibrary } from "./open-library";
 import { fineAt } from "../../utils/rules";
 const staff = ["ADMIN", "BIBLIOTECARIO"] as const;
 const json = (data: unknown, status = 200) =>
@@ -40,6 +43,7 @@ export async function handle(req: Request, segments: string[]) {
     if (resource === "config" && method === "GET")
       return json({
         demo: !databaseUrl(),
+        signupOtpEnabled: false,
         policy: {
           loanDays: Number(process.env.LOAN_DAYS) || 14,
           dailyFineCents: Number(process.env.DAILY_FINE_CENTS) || 100,
@@ -62,6 +66,11 @@ export async function handle(req: Request, segments: string[]) {
         "A conexão com o banco de dados ainda não está configurada.",
       );
     if (resource === "auth") {
+      if (id === "otp" && method === "POST")
+        throw new HttpError(
+          503,
+          "A confirmação por e-mail aguarda a configuração do serviço de envio.",
+        );
       if (id === "register" && method === "POST") {
         const input = registrationSchema.parse(await req.json());
         const address = (
@@ -153,9 +162,12 @@ export async function handle(req: Request, segments: string[]) {
       webhookAuth(req);
       const event = notificationSchema.parse(await req.json());
       const n = await enqueueEvent(event);
+      if (n.status === "PROCESSANDO") await dispatchNotification(n.id);
       return json({ id_notificacao: n.id, status: n.status }, 202);
     }
     const actor = await requireUser();
+    if (resource === "open-library" && method === "GET")
+      return json(await searchOpenLibrary(new URL(req.url).searchParams));
     if (resource === "profile" && method === "PATCH") {
       const input = profileSchema.parse(await req.json());
       const u = await db.$transaction(async (tx) => {
@@ -251,7 +263,16 @@ export async function handle(req: Request, segments: string[]) {
       }
       await requireUser([...staff]);
       if (method === "POST" || method === "PATCH") {
-        const input = bookSchema.parse(await req.json());
+        const existing = id
+          ? await db.book.findUnique({
+              where: { id },
+              select: { format: true },
+            })
+          : null;
+        if (id && !existing) throw new HttpError(404, "Livro não encontrado.");
+        const input = (
+          existing?.format === "DIGITAL" ? digitalBookSchema : bookSchema
+        ).parse(await req.json());
         const b = await db.$transaction(async (tx) => {
           if (id) {
             await tx.$queryRaw`SELECT id FROM "Book" WHERE id = ${id}::uuid FOR UPDATE`;
@@ -402,7 +423,13 @@ export async function handle(req: Request, segments: string[]) {
       if (method === "POST") {
         await requireUser(["ALUNO"]);
         const { bookId } = z.object({ bookId: uuid }).parse(await req.json());
-        return json(await borrow(actor.id, bookId), 201);
+        const loan = await borrow(actor.id, bookId);
+        const notification = await db.notification.findUnique({
+          where: { eventKey: "borrow:" + loan.id },
+          select: { id: true },
+        });
+        if (notification) await dispatchNotification(notification.id);
+        return json(loan, 201);
       }
       if (method === "PATCH" && id) {
         uuid.parse(id);
@@ -450,28 +477,48 @@ export async function handle(req: Request, segments: string[]) {
           tentativas: Math.max(0, ...n.deliveries.map((d) => d.attempts)),
         });
       }
+      if (method === "PATCH" && id && sub === "read") {
+        uuid.parse(id);
+        const changed = await db.inboxNotification.updateMany({
+          where: { notificationId: id, userId: actor.id },
+          data: { readAt: new Date() },
+        });
+        if (!changed.count)
+          throw new HttpError(404, "Notificação não encontrada.");
+        return json({ ok: true });
+      }
+      if (method === "POST" && id === "read-all") {
+        await db.inboxNotification.updateMany({
+          where: { userId: actor.id, readAt: null },
+          data: { readAt: new Date() },
+        });
+        return json({ ok: true });
+      }
       if (method === "GET") {
-        const rows = await db.notification.findMany({
-          where:
-            actor.role === "ALUNO"
-              ? { deliveries: { some: { userId: actor.id } } }
-              : {},
+        const rows = await db.inboxNotification.findMany({
+          where: { userId: actor.id },
           include: {
-            deliveries: {
-              where: actor.role === "ALUNO" ? { userId: actor.id } : {},
-              select: {
-                id: true,
-                channel: true,
-                status: true,
-                attempts: true,
-                lastError: true,
+            notification: {
+              include: {
+                deliveries: {
+                  where: { userId: actor.id },
+                  select: {
+                    id: true,
+                    channel: true,
+                    status: true,
+                    attempts: true,
+                    lastError: true,
+                  },
+                },
               },
             },
           },
           orderBy: { createdAt: "desc" },
           take: 100,
         });
-        return json(rows);
+        return json(
+          rows.map(({ notification, readAt }) => ({ ...notification, readAt })),
+        );
       }
     }
     throw new HttpError(404, "Recurso não encontrado.");

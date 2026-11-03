@@ -178,6 +178,7 @@ export function demoNotifications(): Notification[] {
       message:
         "Sua próxima aventura está esperando! O prazo de devolução de “O pequeno príncipe” termina em dois dias.",
       status: "ENVIADA",
+      readAt: null,
       createdAt: new Date().toISOString(),
       deliveries: [
         {

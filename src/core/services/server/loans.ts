@@ -61,7 +61,12 @@ export async function borrow(userId: string, bookId: string) {
       throw new HttpError(403, "Cadastro sem permissão para empréstimo.");
     if (user.blocked) return null;
     const available = await tx.book.updateMany({
-      where: { id: bookId, available: true, deletedAt: null },
+      where: {
+        id: bookId,
+        available: true,
+        deletedAt: null,
+        format: "PHYSICAL",
+      },
       data: { available: false },
     });
     if (!available.count) throw new HttpError(409, "Livro indisponível");
@@ -79,6 +84,13 @@ export async function borrow(userId: string, bookId: string) {
           dueAt: loan.dueAt.toISOString(),
         },
       },
+    });
+    await enqueue(tx, {
+      eventKey: "borrow:" + loan.id,
+      type: "EMPRESTIMO_CONFIRMADO",
+      message: `Você solicitou o empréstimo de “${(await tx.book.findUniqueOrThrow({ where: { id: bookId } })).title}”. O prazo de devolução é ${loan.dueAt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}. Acompanhe a retirada e o prazo no SIGB.`,
+      channels: ["EMAIL"],
+      recipientIds: [userId],
     });
     return loan;
   });

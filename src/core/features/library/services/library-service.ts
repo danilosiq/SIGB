@@ -5,6 +5,7 @@ export const libraryService = {
     (
       await api.get<{
         demo: boolean;
+        signupOtpEnabled:boolean;
         policy: { loanDays: number; dailyFineCents: number };
       }>("/config")
     ).data,

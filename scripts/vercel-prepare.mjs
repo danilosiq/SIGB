@@ -6,6 +6,7 @@ if (process.env.VERCEL === "1" && databaseUrl()) {
   for (const script of [
     "scripts/migrate.mjs",
     "scripts/check-database.mjs",
+    "scripts/import-public-catalog.mjs",
     "scripts/bootstrap-admin.mjs",
   ]) {
     const result = spawnSync(process.execPath, [script], {

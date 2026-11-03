@@ -6,3 +6,7 @@ node_modules/
 coverage/
 
 .vercel/
+/.swc
+
+# Workflow local durable state (never contains production data)
+.workflow-data/

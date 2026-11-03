@@ -27,6 +27,16 @@ export const bookSchema = z.object({
   pages: z.coerce.number().int().min(1).max(20000),
   available: z.boolean().optional(),
 });
+export const digitalBookSchema = bookSchema.extend({
+  year: z.coerce
+    .number()
+    .int()
+    .refine(
+      (year) => year === 0 || (year >= 1000 && year <= 2100),
+      "Informe um ano entre 1000 e 2100 ou deixe em branco.",
+    ),
+  pages: z.coerce.number().int().min(0).max(20000),
+});
 export const notificationSchema = z.object({
   eventKey: z.string().min(1).max(200),
   type: z.string().min(1).max(80),

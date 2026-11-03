@@ -12,12 +12,7 @@ export function Brand({
       aria-label="SIGB — Biblioteca digital"
     >
       <img src="/brand/sigb-mark.svg" width={44} height={44} alt="" />
-      {!markOnly && (
-        <span className="brand-wordmark">
-          SIGB
-          <span className="brand-signature" aria-hidden="true" />
-        </span>
-      )}
+      {!markOnly && <span className="brand-wordmark">SIGB</span>}
     </span>
   );
 }

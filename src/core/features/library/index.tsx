@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Search,
   Bell,
+  Globe,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +16,6 @@ import {
   Plus,
   ArrowLeftRight,
   Users,
-  LogOut,
   Menu,
   X,
   Bookmark,
@@ -23,30 +23,26 @@ import {
   CheckCheck,
   AlertTriangle,
   Shield,
-  UserRound,
-  Leaf,
   Heart,
-  Sun,
-  Moon,
   Pencil,
   Trash2,
   LoaderCircle,
 } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { PageTitle, Stat, Empty, LoanTable } from "./components/library-shared";
-import { ptBR } from "date-fns/locale";
 import type { Book, User, View, Role, Loan } from "@/core/@types";
 import { Modal } from "@/core/components/modal";
 import { useLibrary } from "./hooks/use-library";
 import { libraryService as service } from "./services/library-service";
 import { roles } from "./data/demo";
+import { LibrarySidebar } from "./components/library-sidebar";
+import { NotificationsPanel } from "./components/notifications-panel";
+import { OpenLibraryPanel } from "./components/open-library-panel";
 import { BookForm } from "./components/book-form";
 import { UserForm } from "./components/user-form";
 import { Brand } from "@/core/components/brand";
 import { AuthScreen } from "./components/auth-screen";
 import { errorMessage } from "@/core/services/api-service";
-const date = (v: string) =>
-  format(new Date(v), "dd MMM yyyy", { locale: ptBR });
 const money = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     cents / 100,
@@ -68,6 +64,7 @@ const titles: Record<View, string> = {
   users: "Usuários",
   notifications: "Notificações",
   profile: "Meu perfil",
+  "open-library": "Biblioteca aberta",
 };
 export function Library() {
   const state = useLibrary();
@@ -90,6 +87,7 @@ export function Library() {
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
   const [mobile, setMobile] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
   const [selected, setSelected] = useState<Book | null>(null);
   const [editing, setEditing] = useState<Book | undefined>();
@@ -153,21 +151,29 @@ export function Library() {
       </div>
     );
   if (!user) return <AuthScreen error={state.error} />;
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
   const nav = [
     { id: "overview" as View, label: "Visão geral", icon: LayoutDashboard },
-    { id: "catalog" as View, label: "Explorar acervo", icon: LibraryIcon },
+    { id: "catalog" as View, label: "Acervo", icon: LibraryIcon },
     {
       id: "loans" as View,
       label: staff ? "Empréstimos" : "Meus empréstimos",
       icon: ArrowLeftRight,
     },
+    { id: "open-library" as View, label: "Biblioteca aberta", icon: Globe },
     { id: "notifications" as View, label: "Notificações", icon: Bell },
     ...(user.role === "ADMIN"
       ? [{ id: "users" as View, label: "Usuários", icon: Users }]
       : []),
   ];
   return (
-    <div className={"app-shell " + (dark ? "dark" : "")}>
+    <div
+      className={
+        "app-shell " +
+        (dark ? "dark " : "") +
+        (collapsed ? "sidebar-collapsed" : "")
+      }
+    >
       {mobile && (
         <button
           className="sidebar-scrim"
@@ -175,91 +181,29 @@ export function Library() {
           onClick={() => setMobile(false)}
         />
       )}
-      <aside className={"sidebar " + (mobile ? "open" : "")}>
-        <a href="/" aria-label="SIGB — início">
-          <Brand />
-        </a>
-        <span className="sidebar-caption">SUA BIBLIOTECA DIGITAL</span>
-        <nav>
-          {nav.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className={"nav-item " + (view === id ? "active" : "")}
-              onClick={() => navigate(id)}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-              {id === "loans" && active.length > 0 && (
-                <span className="nav-counter">{active.length}</span>
-              )}
-              {id === "notifications" &&
-                notifications.some((n) => n.status === "PROCESSANDO") && <i />}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="reading-note">
-            <span className="note-icon">
-              <Leaf size={19} />
-            </span>
-            <h3>
-              Conhecimento que
-              <br />
-              vai com você.
-            </h3>
-            <p>
-              Uma boa leitura pode
-              <br />
-              mudar o seu dia.
-            </p>
-            <span className="note-line" />
-          </div>
-          <button
-            className={"nav-item " + (view === "profile" ? "active" : "")}
-            onClick={() => navigate("profile")}
-          >
-            <UserRound size={19} />
-            <span>Meu perfil</span>
-          </button>
-          <button className="nav-item" onClick={() => setDark(!dark)}>
-            {dark ? <Sun size={19} /> : <Moon size={19} />}
-            <span>{dark ? "Tema claro" : "Tema escuro"}</span>
-          </button>
-          <div className="sidebar-user">
-            <span className="avatar">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")}
-            </span>
-            <div>
-              <strong>{user.name}</strong>
-              <small>{roles[user.role]}</small>
-            </div>
-            {!demo && (
-              <button
-                className="icon-button"
-                aria-label="Sair da conta"
-                onClick={async () => {
-                  try {
-                    await service.logout();
-                    state.client.clear();
-                    navigate("catalog");
-                  } catch (e) {
-                    setNotice(errorMessage(e));
-                  }
-                }}
-              >
-                <LogOut size={17} />
-              </button>
-            )}
-          </div>
-          <small className="sidebar-footer">
-            © {new Date().getFullYear()} SIGB · Feito para descobrir.
-          </small>
-        </div>
-      </aside>
+      <LibrarySidebar
+        items={nav}
+        user={user}
+        view={view}
+        mobile={mobile}
+        collapsed={collapsed}
+        dark={dark}
+        demo={demo}
+        unreadCount={unreadCount}
+        onNavigate={navigate}
+        onCollapse={() => setCollapsed(!collapsed)}
+        onClose={() => setMobile(false)}
+        onTheme={() => setDark(!dark)}
+        onLogout={async () => {
+          try {
+            await service.logout();
+            state.client.clear();
+            navigate("catalog");
+          } catch (e) {
+            setNotice(errorMessage(e));
+          }
+        }}
+      />
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
@@ -281,11 +225,15 @@ export function Library() {
             </span>
             <button
               className="notification-button icon-button"
-              aria-label="Abrir notificações"
+              aria-label={`Abrir notificações${unreadCount ? `: ${unreadCount} ${unreadCount === 1 ? "não lida" : "não lidas"}` : ""}`}
               onClick={() => navigate("notifications")}
             >
               <Bell size={20} />
-              {soon.length > 0 && <i />}
+              {unreadCount > 0 && (
+                <span className="topbar-unread-count">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
             <button
               className="avatar small-avatar"
@@ -560,11 +508,17 @@ export function Library() {
                           <span
                             className={
                               "availability " +
-                              (book.available ? "" : "unavailable")
+                              (book.format === "DIGITAL" || book.available
+                                ? ""
+                                : "unavailable")
                             }
                           >
                             <span />
-                            {book.available ? "Disponível" : "Emprestado"}
+                            {book.format === "DIGITAL"
+                              ? "Leitura aberta"
+                              : book.available
+                                ? "Disponível"
+                                : "Emprestado"}
                           </span>
                           {book.coverUrl ? (
                             <img
@@ -593,9 +547,13 @@ export function Library() {
                           <p>{book.author}</p>
                           <div className="book-card-footer">
                             <span>
-                              {book.year}
-                              <span>·</span>
-                              {book.pages} páginas
+                              {book.year || "Edição digital"}
+                              {book.pages > 0 && (
+                                <>
+                                  <span>·</span>
+                                  {book.pages} páginas
+                                </>
+                              )}
                             </span>
                             <button
                               onClick={() => setSelected(book)}
@@ -912,83 +870,14 @@ export function Library() {
               </div>
             </>
           )}
+          {view === "open-library" && <OpenLibraryPanel />}
           {view === "notifications" && (
-            <>
-              <PageTitle
-                kicker="TUDO EM DIA, SEM PERDER UM CAPÍTULO"
-                title="Notificações"
-                text="Lembretes de devolução e atualizações da sua biblioteca."
-              />
-              <div className="notification-list">
-                {notifications.map((n) => (
-                  <article className="notification-card" key={n.id}>
-                    <span className="notification-symbol">
-                      <Bell size={23} />
-                    </span>
-                    <div>
-                      <div className="notification-title">
-                        <h3>
-                          {n.type === "PRAZO_PROXIMO"
-                            ? "Sua leitura tem um lembrete"
-                            : n.type === "BLOQUEIO_POR_ATRASO"
-                              ? "Bloqueio por atraso"
-                              : n.type.replaceAll("_", " ").toLowerCase()}
-                        </h3>
-                        <span
-                          className={
-                            "pill " +
-                            (n.status === "ENVIADA"
-                              ? "success"
-                              : n.status === "FALHA"
-                                ? "warning"
-                                : "neutral")
-                          }
-                        >
-                          {n.status === "ENVIADA"
-                            ? "Enviada"
-                            : n.status === "FALHA"
-                              ? "Falha"
-                              : "Processando"}
-                        </span>
-                      </div>
-                      <p>{n.message}</p>
-                      <small>
-                        {date(n.createdAt)}
-                        <span>·</span>
-                        {n.deliveries
-                          .map(
-                            (d) =>
-                              `${d.channel} · ${d.attempts}/3 tentativa(s)`,
-                          )
-                          .join(" | ")}
-                      </small>
-                      {staff && n.deliveries.some((d) => d.lastError) && (
-                        <p className="delivery-error">
-                          {n.deliveries
-                            .filter((d) => d.lastError)
-                            .map((d) => d.lastError)
-                            .join(" · ")}
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-              {!notifications.length && (
-                <Empty
-                  icon={Bell}
-                  title="Tudo tranquilo por aqui"
-                  text="Seus lembretes e atualizações aparecerão nesta página."
-                />
-              )}
-              {staff && (
-                <p className="policy-note">
-                  <Shield size={15} />
-                  Envio assíncrono por e-mail, SMS ou WhatsApp. Até 3 tentativas
-                  por destinatário e canal, com intervalos crescentes.
-                </p>
-              )}
-            </>
+            <NotificationsPanel
+              notifications={notifications}
+              pending={pending}
+              staff={!!staff}
+              run={run}
+            />
           )}
           {view === "profile" && (
             <>
@@ -1077,12 +966,17 @@ export function Library() {
               <p className="detail-author">por {selected.author}</p>
               <span
                 className={
-                  "pill " + (selected.available ? "success" : "warning")
+                  "pill " +
+                  (selected.format === "DIGITAL" || selected.available
+                    ? "success"
+                    : "warning")
                 }
               >
-                {selected.available
-                  ? "Disponível para empréstimo"
-                  : "Livro indisponível"}
+                {selected.format === "DIGITAL"
+                  ? "Leitura aberta"
+                  : selected.available
+                    ? "Disponível para empréstimo"
+                    : "Livro indisponível"}
               </span>
               <p className="description">{selected.description}</p>
               <dl>
@@ -1092,18 +986,32 @@ export function Library() {
                 </div>
                 <div>
                   <dt>Ano</dt>
-                  <dd>{selected.year}</dd>
+                  <dd>{selected.year || "Edição digital"}</dd>
                 </div>
                 <div>
                   <dt>Páginas</dt>
-                  <dd>{selected.pages}</dd>
+                  <dd>{selected.pages || "Não informado"}</dd>
                 </div>
                 <div>
-                  <dt>ISBN</dt>
+                  <dt>
+                    {selected.format === "DIGITAL" ? "ID na fonte" : "ISBN"}
+                  </dt>
                   <dd>{selected.isbn}</dd>
                 </div>
               </dl>
-              {!staff && (
+              {selected.format === "DIGITAL" && selected.readingUrl && (
+                <a
+                  className="button primary"
+                  href={selected.readingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <BookOpen size={17} />
+                  Abrir leitura
+                  <ArrowUpRight size={16} />
+                </a>
+              )}
+              {!staff && selected.format !== "DIGITAL" && (
                 <button
                   className="button primary"
                   disabled={pending}

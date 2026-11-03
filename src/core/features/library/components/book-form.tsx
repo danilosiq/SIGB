@@ -14,6 +14,7 @@ export function BookForm({
   onDone: () => void;
   pending: boolean;
 }) {
+  const digital = book?.format === "DIGITAL";
   const [file, setFile] = useState<File | null>(null);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -90,25 +91,31 @@ export function BookForm({
           />
         </label>
         <label>
-          Ano
+          Ano{digital ? " (opcional)" : ""}
           <input
             name="year"
             type="number"
             min={1000}
             max={2100}
-            defaultValue={book?.year ?? 2026}
-            required
+            defaultValue={
+              digital && book?.year === 0 ? "" : (book?.year ?? 2026)
+            }
+            placeholder={digital ? "Não informado" : undefined}
+            required={!digital}
           />
         </label>
         <label>
-          Páginas
+          Páginas{digital ? " (opcional)" : ""}
           <input
             name="pages"
             type="number"
             min={1}
             max={20000}
-            defaultValue={book?.pages ?? 200}
-            required
+            defaultValue={
+              digital && book?.pages === 0 ? "" : (book?.pages ?? 200)
+            }
+            placeholder={digital ? "Não informado" : undefined}
+            required={!digital}
           />
         </label>
         <label>

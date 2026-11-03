@@ -36,6 +36,7 @@ export async function enqueue(tx: Prisma.TransactionClient, event: Event) {
       type: event.type,
       message: event.message,
       deliveries: { create: deliveries },
+      inbox: { create: people.map((person) => ({ userId: person.id })) },
     },
   });
   await tx.audit.create({
@@ -78,13 +79,13 @@ async function settle(notificationId: string) {
     });
   });
 }
-export async function processNext() {
+export async function processNext(notificationId?: string) {
   const now = new Date();
   const token = randomUUID();
   const delivery = await db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<
       { id: string }[]
-    >`SELECT id FROM "Delivery" WHERE status = 'PROCESSANDO' AND "nextAttemptAt" <= ${now} AND ("lockedUntil" IS NULL OR "lockedUntil" < ${now}) ORDER BY "nextAttemptAt" LIMIT 1 FOR UPDATE SKIP LOCKED`;
+    >`SELECT id FROM "Delivery" WHERE status = 'PROCESSANDO' AND (${notificationId ?? null}::text IS NULL OR "notificationId" = ${notificationId ?? null}::uuid) AND "nextAttemptAt" <= (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC') AND ("lockedUntil" IS NULL OR "lockedUntil" < (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC')) ORDER BY "nextAttemptAt" LIMIT 1 FOR UPDATE SKIP LOCKED`;
     if (!rows[0]) return null;
     const previous = await tx.delivery.findUniqueOrThrow({
       where: { id: rows[0].id },

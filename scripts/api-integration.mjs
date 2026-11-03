@@ -82,6 +82,20 @@ assert.equal(
 );
 const admin = await login("admin@sigb.local", "TestOnly-Admin-2026");
 assert.equal((await call("/api/users")).status, 401);
+const digitalEdition = (
+  await call("/api/books", "GET", undefined, admin)
+).data.find((b) => b.format === "DIGITAL");
+assert.ok(digitalEdition);
+const digitalEdit = await call(
+  "/api/books/" + digitalEdition.id,
+  "PATCH",
+  digitalEdition,
+  admin,
+);
+assert.equal(digitalEdit.status, 200, JSON.stringify(digitalEdit.data));
+assert.equal(digitalEdit.data.year, 0);
+assert.equal(digitalEdit.data.pages, 0);
+
 const input = {
   name: "Aluno HTTP",
   email: "http-" + suffix + "@test.local",
@@ -126,6 +140,22 @@ const book = {
   pages: 120,
 };
 assert.equal((await call("/api/books", "POST", book, student)).status, 403);
+assert.equal(
+  (
+    await call(
+      "/api/books",
+      "POST",
+      { ...book, year: 0, pages: 0, format: "DIGITAL" },
+      staff,
+    )
+  ).status,
+  400,
+);
+assert.equal(
+  (await call("/api/loans", "POST", { bookId: digitalEdition.id }, student))
+    .status,
+  409,
+);
 const saved = await call("/api/books", "POST", book, staff);
 assert.equal(saved.status, 201);
 const bookId = saved.data.id;
@@ -164,6 +194,55 @@ assert.equal((await call("/api/books/" + bookId + "/cover")).status, 401);
 const borrowed = await call("/api/loans", "POST", { bookId }, student);
 assert.equal(borrowed.status, 201);
 const loanId = borrowed.data.id;
+const inbox = await call("/api/notificacoes", "GET", undefined, student);
+const ownNotice = inbox.data.find((n) => n.type === "EMPRESTIMO_CONFIRMADO");
+assert.ok(ownNotice, "borrow must create an in-app receipt");
+assert.equal(ownNotice.readAt, null);
+assert.equal(
+  (
+    await call(
+      "/api/notificacoes/" + ownNotice.id + "/read",
+      "PATCH",
+      undefined,
+      other,
+    )
+  ).status,
+  404,
+);
+assert.equal(
+  (await call("/api/notificacoes/" + ownNotice.id + "/read", "PATCH")).status,
+  401,
+);
+assert.equal(
+  (
+    await call(
+      "/api/notificacoes/" + ownNotice.id + "/read",
+      "PATCH",
+      undefined,
+      student,
+    )
+  ).status,
+  200,
+);
+assert.ok(
+  (await call("/api/notificacoes", "GET", undefined, student)).data.find(
+    (n) => n.id === ownNotice.id,
+  ).readAt,
+);
+assert.equal(
+  (await call("/api/notificacoes", "GET", undefined, other)).data.some(
+    (n) => n.id === ownNotice.id,
+  ),
+  false,
+);
+assert.equal(
+  (await call("/api/notificacoes/read-all", "POST", undefined, student)).status,
+  200,
+);
+assert.equal((await call("/api/jobs/reminders")).status, 401);
+assert.equal((await call("/api/config")).data.signupOtpEnabled, false);
+assert.equal((await call("/api/auth/otp", "POST", registration)).status, 503);
+
 assert.equal((await call("/api/loans", "POST", { bookId }, other)).status, 409);
 assert.equal(
   (await call("/api/loans", "GET", undefined, other)).data.length,
