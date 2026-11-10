@@ -129,11 +129,50 @@ assert.equal(
   ).data.role,
   "ALUNO",
 );
+assert.equal((await call("/api/categories")).status, 401);
+assert.equal(
+  (await call("/api/categories", "GET", undefined, student)).status,
+  200,
+);
+const categoryName = "Categoria HTTP " + suffix.slice(0, 8);
+assert.equal(
+  (await call("/api/categories", "POST", { name: categoryName }, student))
+    .status,
+  403,
+);
+assert.equal(
+  (await call("/api/categories", "POST", { name: " " }, staff)).status,
+  400,
+);
+const registeredCategory = await call(
+  "/api/categories",
+  "POST",
+  { name: "  " + categoryName + "  " },
+  staff,
+);
+assert.equal(registeredCategory.status, 201);
+assert.equal(registeredCategory.data.name, categoryName);
+assert.equal(
+  (
+    await call(
+      "/api/categories",
+      "POST",
+      { name: categoryName.toLowerCase() },
+      admin,
+    )
+  ).status,
+  409,
+);
+assert.ok(
+  (await call("/api/categories", "GET", undefined, admin)).data.some(
+    (c) => c.id === registeredCategory.data.id,
+  ),
+);
 const book = {
   title: "Livro HTTP",
   author: "Autor de Teste",
   isbn: suffix.replaceAll("-", ""),
-  category: "Ciência",
+  category: categoryName,
   sector: "Ciências exatas",
   shelf: "A-03",
   description: "Exemplar para teste de API",
@@ -158,15 +197,38 @@ assert.equal(
     .status,
   409,
 );
+assert.equal(
+  (
+    await call(
+      "/api/books",
+      "POST",
+      { ...book, category: "Não cadastrada " + suffix.slice(0, 8) },
+      staff,
+    )
+  ).status,
+  400,
+);
 const saved = await call("/api/books", "POST", book, staff);
 assert.equal(saved.status, 201);
 const bookId = saved.data.id;
+const categoryFilter =
+  "/api/books?category=" + encodeURIComponent(categoryName.toLowerCase());
+const grouped = await call(categoryFilter, "GET", undefined, student);
+assert.equal(grouped.status, 200);
+assert.equal(grouped.data.length, 1);
+assert.equal(grouped.data[0].id, bookId);
+assert.equal(
+  (await call("/api/categories", "GET", undefined, staff)).data.find(
+    (c) => c.id === registeredCategory.data.id,
+  )._count.books,
+  1,
+);
 assert.equal(saved.data.sector, book.sector);
 assert.equal(saved.data.shelf, book.shelf);
 const relocated = await call(
   "/api/books/" + bookId,
   "PATCH",
-  { ...book, sector: "Referência", shelf: "B-12" },
+  { ...book, category: "Literatura", sector: "Referência", shelf: "B-12" },
   staff,
 );
 assert.equal(relocated.status, 200);
@@ -174,6 +236,11 @@ const reloaded = (await call("/api/books/" + bookId, "GET", undefined, staff))
   .data[0];
 assert.equal(reloaded.sector, "Referência");
 assert.equal(reloaded.shelf, "B-12");
+assert.equal(reloaded.category, "Literatura");
+assert.equal(
+  (await call(categoryFilter, "GET", undefined, student)).data.length,
+  0,
+);
 assert.equal(
   (
     await call("/api/books", "POST", book, staff, {

@@ -71,9 +71,19 @@ try {
             select: { id: true },
           });
           if (existing) return false;
+          const category =
+            (await tx.category.findFirst({
+              where: { name: { equals: book.category, mode: "insensitive" } },
+            })) ??
+            (await tx.category.upsert({
+              where: { name: book.category },
+              create: { name: book.category },
+              update: {},
+            }));
           const added = await tx.book.create({
             data: {
               ...book,
+              category: category.name,
               available: true,
               cover: { create: { mime, data } },
             },

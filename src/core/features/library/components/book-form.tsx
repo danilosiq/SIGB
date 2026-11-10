@@ -1,20 +1,46 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import type { Book } from "@/core/@types";
+import type { Book, Category } from "@/core/@types";
 import { UploadCloud } from "lucide-react";
 import { libraryService as service } from "../services/library-service";
 export function BookForm({
   book,
+  categories,
   run,
   onDone,
   pending,
 }: {
   book?: Book;
+  categories: Category[];
   run: (fn: () => Promise<unknown>) => Promise<boolean>;
   onDone: () => void;
   pending: boolean;
 }) {
   const digital = book?.format === "DIGITAL";
+  const [category, setCategory] = useState(book?.category ?? "");
+  const [createdCategories, setCreatedCategories] = useState<string[]>([]);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const categoryNames = [
+    ...new Set([
+      ...(book?.category ? [book.category] : []),
+      ...categories.map((item) => item.name),
+      ...createdCategories,
+    ]),
+  ].sort((left, right) => left.localeCompare(right, "pt-BR"));
+  async function addCategory() {
+    const name = categoryName.trim();
+    if (pending || name.length < 2 || name.length > 60) return;
+    const ok = await run(async () => {
+      const created = await service.createCategory(name);
+      setCreatedCategories((current) => [...current, created.name]);
+      setCategory(created.name);
+    });
+    if (ok) {
+      setCategoryName("");
+      setCreatingCategory(false);
+    }
+  }
   const [file, setFile] = useState<File | null>(null);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,22 +91,64 @@ export function BookForm({
           ISBN / código do exemplar
           <input name="isbn" defaultValue={book?.isbn} required minLength={5} />
         </label>
-        <label>
-          Categoria
-          <select name="category" defaultValue={book?.category ?? "Literatura"}>
-            {[
-              "Literatura",
-              "Ficção",
-              "Design",
-              "História",
-              "Ciência",
-              "Tecnologia",
-              "Desenvolvimento pessoal",
-            ].map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
+        <div className="form">
+          <label>
+            Categoria
+            <select
+              name="category"
+              value={category || categoryNames[0] || ""}
+              onChange={(event) => setCategory(event.target.value)}
+              required
+              disabled={pending}
+            >
+              {!categoryNames.length && (
+                <option value="">Cadastre uma categoria</option>
+              )}
+              {categoryNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setCreatingCategory((current) => !current)}
+            aria-expanded={creatingCategory}
+            disabled={pending}
+          >
+            {creatingCategory ? "Cancelar nova categoria" : "Nova categoria"}
+          </button>
+          {creatingCategory && (
+            <div className="form">
+              <label>
+                Nome da nova categoria
+                <input
+                  value={categoryName}
+                  onChange={(event) => setCategoryName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void addCategory();
+                    }
+                  }}
+                  maxLength={60}
+                  placeholder="Ex.: Biografias"
+                  disabled={pending}
+                />
+              </label>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={addCategory}
+                disabled={pending || categoryName.trim().length < 2}
+              >
+                {pending ? "Salvando…" : "Adicionar categoria"}
+              </button>
+            </div>
+          )}
+        </div>
         <label>
           Setor
           <input

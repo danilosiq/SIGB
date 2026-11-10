@@ -57,26 +57,29 @@ model LoginAttempt {
 }
 
 model Book {
-  id          String    @id @default(uuid()) @db.Uuid
-  title       String
-  author      String
-  isbn        String    @unique
-  category    String
-  sector      String?
-  shelf       String?
-  description String
-  publisher   String
-  year        Int
-  pages       Int
-  format      String    @default("PHYSICAL")
-  readingUrl  String?
-  source      String?
-  externalId  String?   @unique
-  available   Boolean   @default(true)
-  deletedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  cover       Cover?
-  loans       Loan[]
+  id           String    @id @default(uuid()) @db.Uuid
+  title        String
+  author       String
+  isbn         String    @unique
+  category     String
+  categoryInfo Category  @relation(fields: [category], references: [name], onDelete: Restrict, onUpdate: Cascade)
+  sector       String?
+  shelf        String?
+  description  String
+  publisher    String
+  year         Int
+  pages        Int
+  format       String    @default("PHYSICAL")
+  readingUrl   String?
+  source       String?
+  externalId   String?   @unique
+  available    Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  cover        Cover?
+  loans        Loan[]
+
+  @@index([category, deletedAt])
 }
 
 model Cover {
@@ -156,4 +159,11 @@ model InboxNotification {
 
   @@unique([notificationId, userId])
   @@index([userId, readAt, createdAt])
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now())
+  books     Book[]
 }

@@ -1,11 +1,11 @@
 import { api } from "@/core/services/api-service";
-import type { Book, Loan, User, Notification } from "@/core/@types";
+import type { Book, Loan, User, Notification, Category } from "@/core/@types";
 export const libraryService = {
   config: async () =>
     (
       await api.get<{
         demo: boolean;
-        signupOtpEnabled:boolean;
+        signupOtpEnabled: boolean;
         policy: { loanDays: number; dailyFineCents: number };
       }>("/config")
     ).data,
@@ -21,6 +21,9 @@ export const libraryService = {
   logout: async () => {
     await api.post("/auth/logout");
   },
+  categories: async () => (await api.get<Category[]>("/categories")).data,
+  createCategory: async (name: string) =>
+    (await api.post<Category>("/categories", { name })).data,
   books: async () => (await api.get<Book[]>("/books")).data,
   loans: async () => (await api.get<Loan[]>("/loans")).data,
   users: async () => (await api.get<User[]>("/users")).data,

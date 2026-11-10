@@ -166,6 +166,58 @@ export async function handle(req: Request, segments: string[]) {
       return json({ id_notificacao: n.id, status: n.status }, 202);
     }
     const actor = await requireUser();
+    if (resource === "categories") {
+      if (method === "GET")
+        return json(
+          await db.category.findMany({
+            orderBy: { name: "asc" },
+            include: {
+              _count: { select: { books: { where: { deletedAt: null } } } },
+            },
+          }),
+        );
+      if (method === "POST") {
+        await requireUser([...staff]);
+        const input = z
+          .object({
+            name: z
+              .string()
+              .trim()
+              .min(2, "Informe o nome da categoria.")
+              .max(60),
+          })
+          .strict()
+          .parse(await req.json());
+        if (
+          await db.category.findFirst({
+            where: { name: { equals: input.name, mode: "insensitive" } },
+          })
+        )
+          throw new HttpError(409, "Já existe uma categoria com este nome.");
+        try {
+          const category = await db.$transaction(async (tx) => {
+            const created = await tx.category.create({ data: input });
+            await tx.audit.create({
+              data: {
+                actorId: actor.id,
+                action: "CATEGORIA_CRIADA",
+                entityId: created.id,
+                details: input,
+              },
+            });
+            return created;
+          });
+          return json(category, 201);
+        } catch (error) {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          )
+            throw new HttpError(409, "Já existe uma categoria com este nome.");
+          throw error;
+        }
+      }
+    }
     if (resource === "open-library" && method === "GET")
       return json(await searchOpenLibrary(new URL(req.url).searchParams));
     if (resource === "profile" && method === "PATCH") {
@@ -240,10 +292,25 @@ export async function handle(req: Request, segments: string[]) {
       if (method === "GET") {
         const url = new URL(req.url);
         const search = (url.searchParams.get("search") ?? "").slice(0, 200);
+        const requestedCategory = url.searchParams
+          .get("category")
+          ?.trim()
+          .slice(0, 60);
+        const registeredCategory = requestedCategory
+          ? await db.category.findFirst({
+              where: {
+                name: { equals: requestedCategory, mode: "insensitive" },
+              },
+            })
+          : null;
+        if (requestedCategory && !registeredCategory) return json([]);
         const books = await db.book.findMany({
           where: {
             deletedAt: null,
             ...(id ? { id } : {}),
+            ...(registeredCategory
+              ? { category: registeredCategory.name }
+              : {}),
             OR: [
               { title: { contains: search, mode: "insensitive" } },
               { author: { contains: search, mode: "insensitive" } },
@@ -273,6 +340,12 @@ export async function handle(req: Request, segments: string[]) {
         const input = (
           existing?.format === "DIGITAL" ? digitalBookSchema : bookSchema
         ).parse(await req.json());
+        const category = await db.category.findFirst({
+          where: { name: { equals: input.category, mode: "insensitive" } },
+        });
+        if (!category)
+          throw new HttpError(400, "Selecione uma categoria cadastrada.");
+        input.category = category.name;
         const b = await db.$transaction(async (tx) => {
           if (id) {
             await tx.$queryRaw`SELECT id FROM "Book" WHERE id = ${id}::uuid FOR UPDATE`;

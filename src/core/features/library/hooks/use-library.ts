@@ -34,6 +34,11 @@ export function useLibrary() {
     queryFn: service.books,
     enabled,
   });
+  const categories = useQuery({
+    queryKey: ["categories"],
+    queryFn: service.categories,
+    enabled,
+  });
   const loans = useQuery({
     queryKey: ["loans", user?.id],
     queryFn: service.loans,
@@ -80,15 +85,28 @@ export function useLibrary() {
     config,
     session,
     books: demo ? demoBooks : (books.data ?? []),
+    categories: demo
+      ? [...new Set(demoBooks.map((b) => b.category))]
+          .sort()
+          .map((name) => ({
+            id: name,
+            name,
+            _count: {
+              books: demoBooks.filter((b) => b.category === name).length,
+            },
+          }))
+      : (categories.data ?? []),
     loans: demo ? demoLoans() : (loans.data ?? []),
     users: demo ? demoUsers : (users.data ?? []),
     notifications: demo ? demoNotifications() : (notifications.data ?? []),
     loading:
-      config.isLoading || (!demo && (session.isLoading || books.isLoading)),
+      config.isLoading ||
+      (!demo && (session.isLoading || books.isLoading || categories.isLoading)),
     error:
       config.error ||
       session.error ||
       books.error ||
+      categories.error ||
       loans.error ||
       users.error ||
       notifications.error,

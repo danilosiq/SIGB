@@ -193,3 +193,7 @@ A marca SIGB é um monograma vetorial próprio: duas faixas entrelaçadas formam
 - **Pendente externo:** não há conta de e-mail nem remetente verificado. Nenhum envio real foi ativado. A interface de OTP está preparada, mas `signupOtpEnabled` permanece `false`, o endpoint OTP informa 503 e o cadastro direto de alunos continua disponível. É necessário provisionar o provedor e concluir o backend de emissão/validação antes de ativar a etapa OTP; nenhuma verificação é simulada.
 
 Validação adicional: testes de inbox em banco descartável cobrem atomicidade, rollback integral por falha real na criação do recibo, idempotência concorrente, isolamento de leitura por usuário e impedimento de empréstimo de edição digital. A integração HTTP confirma autenticação e propriedade dos recibos.
+
+## Categorias cadastradas
+
+Administradores e bibliotecários cadastram categorias pelo botão **Categorias** do acervo ou por **Nova categoria** no formulário de livro. Alunos consultam e filtram pelas categorias registradas. `GET /api/categories` lista nomes e contagem de livros; `POST /api/categories` cadastra um nome único. Os livros possuem vínculo obrigatório com uma categoria cadastrada, protegido por chave estrangeira; categorias anteriores são migradas preservando o acervo. `GET /api/books?category=Literatura` filtra pelo nome registrado.
