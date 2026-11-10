@@ -176,6 +176,30 @@ export function OpenLibraryPanel() {
           </nav>
         </>
       )}
+      <footer className={styles.attribution}>
+        <span>Fonte dos dados:</span>
+        {kind === "books" ? (
+          <span>
+            <a href="https://gutendex.com/" target="_blank" rel="noopener noreferrer">
+              Gutendex
+            </a>
+            {" · "}
+            <a href="https://www.gutenberg.org/" target="_blank" rel="noopener noreferrer">
+              Project Gutenberg
+            </a>
+          </span>
+        ) : (
+          <span>
+            <a href="https://europepmc.org/" target="_blank" rel="noopener noreferrer">
+              Europe PMC
+            </a>
+            {" · "}
+            <a href="https://pmc.ncbi.nlm.nih.gov/" target="_blank" rel="noopener noreferrer">
+              PubMed Central
+            </a>
+          </span>
+        )}
+      </footer>
     </section>
   );
 }

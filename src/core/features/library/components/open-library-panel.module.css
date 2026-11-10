@@ -295,3 +295,22 @@
   line-height: 1.8;
   color: #726541;
 }
+
+.attribution {
+  margin-top: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line, #e7ebe4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted, #7d857e);
+}
+.attribution a {
+  color: var(--green, #255b43);
+  font-weight: 600;
+}
+.attribution a:hover {
+  text-decoration: underline;
+}
