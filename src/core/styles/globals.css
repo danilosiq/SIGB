@@ -2617,16 +2617,15 @@ td small {
   --muted: #7d857e;
 }
 
-/* Fólio: navegação discreta e espaço dedicado à leitura. */
+/* Layout sem menu lateral: conteúdo ocupa toda a largura. */
 .app-shell {
-  --sidebar-width: 224px;
+  --sidebar-width: 0px;
 }
 .sidebar {
-  width: var(--sidebar-width);
-  padding: 26px 14px 18px;
+  display: none;
 }
 .main-shell {
-  margin-left: var(--sidebar-width);
+  margin-left: 0;
   transition: margin-left 0.2s ease;
 }
 .sidebar-header {
@@ -2822,7 +2821,7 @@ td small {
 }
 @media (min-width: 761px) {
   .sidebar-collapsed {
-    --sidebar-width: 80px;
+    --sidebar-width: 0px;
   }
   .sidebar-collapsed .sidebar {
     padding-inline: 12px;
