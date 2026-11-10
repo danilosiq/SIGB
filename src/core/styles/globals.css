@@ -69,6 +69,7 @@ button {
   background: #d7e8cf;
 }
 .app-shell {
+  --sidebar-width: 0px;
   --bg: #f8f9f6;
   --surface: #fff;
   --text: #263d34;
@@ -259,7 +260,7 @@ button {
   padding: 7px 0;
 }
 .main-shell {
-  margin-left: 242px;
+  margin-left: 0;
 }
 .topbar {
   height: 78px;
@@ -2896,5 +2897,121 @@ td small {
 @media (prefers-reduced-motion: reduce) {
   .main-shell {
     transition: none;
+  }
+}
+
+.catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.category-tabs {
+  min-width: 0;
+}
+
+.registered-category-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+.registered-category-list li {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.registered-category-list li span {
+  color: var(--muted);
+}
+
+
+/* Top header navigation layout (no sidebar) */
+.topbar.topbar-tabs-layout {
+  height: auto;
+  padding: 22px 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+}
+.topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.topbar-brand .brand {
+  padding-left: 0;
+  font-size: 24px;
+  letter-spacing: -1.2px;
+}
+.top-tabs {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  overflow-x: auto;
+  padding: 0 2px 14px;
+  scrollbar-width: none;
+}
+.top-tabs::-webkit-scrollbar {
+  display: none;
+}
+.top-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 1.5px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  letter-spacing: 0.1px;
+}
+.top-tab:hover {
+  color: var(--text);
+  background: transparent;
+}
+.top-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  background: transparent;
+}
+.top-tab-counter {
+  margin-left: 2px;
+  font-size: 10px;
+}
+.topbar .top-actions .avatar.active {
+  outline: 1.5px solid var(--text);
+  outline-offset: 2px;
+}
+@media (max-width: 900px) {
+  .topbar.topbar-tabs-layout {
+    padding: 16px 18px 0;
+    gap: 14px;
+  }
+  .topbar-row {
+    flex-wrap: wrap;
+  }
+  .top-tabs {
+    gap: 18px;
+  }
+  .top-tab {
+    font-size: 12px;
   }
 }

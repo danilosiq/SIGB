@@ -16,7 +16,6 @@ import {
   Plus,
   ArrowLeftRight,
   Users,
-  Menu,
   X,
   Bookmark,
   Clock,
@@ -27,6 +26,9 @@ import {
   Pencil,
   Trash2,
   LoaderCircle,
+  LogOut,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { PageTitle, Stat, Empty, LoanTable } from "./components/library-shared";
@@ -35,9 +37,9 @@ import { Modal } from "@/core/components/modal";
 import { useLibrary } from "./hooks/use-library";
 import { libraryService as service } from "./services/library-service";
 import { roles } from "./data/demo";
-import { LibrarySidebar } from "./components/library-sidebar";
 import { NotificationsPanel } from "./components/notifications-panel";
 import { OpenLibraryPanel } from "./components/open-library-panel";
+import { CategoryManager } from "./components/category-manager";
 import { BookForm } from "./components/book-form";
 import { UserForm } from "./components/user-form";
 import { Brand } from "@/core/components/brand";
@@ -47,31 +49,13 @@ const money = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     cents / 100,
   );
-const categories = [
-  "Todos os livros",
-  "Literatura",
-  "Ficção",
-  "Desenvolvimento pessoal",
-  "História",
-  "Design",
-  "Ciência",
-  "Tecnologia",
-];
-const titles: Record<View, string> = {
-  catalog: "Explorar acervo",
-  overview: "Visão geral",
-  loans: "Empréstimos",
-  users: "Usuários",
-  notifications: "Notificações",
-  profile: "Meu perfil",
-  "open-library": "Biblioteca aberta",
-};
 export function Library() {
   const state = useLibrary();
   const {
     user,
     demo,
     books,
+    categories,
     loans,
     users,
     notifications,
@@ -82,16 +66,15 @@ export function Library() {
   } = state;
   const [view, setView] = useState<View>("catalog");
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("Todos os livros");
+  const [category, setCategory] = useState<string | null>(null);
   const [availability, setAvailability] = useState("all");
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
-  const [mobile, setMobile] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(false);
   const [selected, setSelected] = useState<Book | null>(null);
   const [editing, setEditing] = useState<Book | undefined>();
   const [bookForm, setBookForm] = useState(false);
+  const [categoryForm, setCategoryForm] = useState(false);
   const [userForm, setUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | undefined>();
   const [confirm, setConfirm] = useState<{
@@ -102,9 +85,26 @@ export function Library() {
   const [deadline, setDeadline] = useState<Loan | null>(null);
   const [appointment, setAppointment] = useState<Loan | null>(null);
   useEffect(() => {
-    if (selected || bookForm || userForm || confirm || deadline || appointment)
+    if (
+      selected ||
+      bookForm ||
+      categoryForm ||
+      userForm ||
+      confirm ||
+      deadline ||
+      appointment
+    )
       setNotice("");
-  }, [selected, bookForm, userForm, confirm, deadline, appointment, setNotice]);
+  }, [
+    selected,
+    bookForm,
+    categoryForm,
+    userForm,
+    confirm,
+    deadline,
+    appointment,
+    setNotice,
+  ]);
   const loanDays = state.config.data?.policy?.loanDays ?? 14;
   const staff = user?.role === "ADMIN" || user?.role === "BIBLIOTECARIO";
   const active = loans.filter((l) => !l.returnedAt);
@@ -114,7 +114,7 @@ export function Library() {
   const filtered = books
     .filter(
       (b) =>
-        (category === "Todos os livros" || b.category === category) &&
+        (category === null || b.category === category) &&
         (availability === "all" ||
           b.available === (availability === "available")) &&
         `${b.title} ${b.author} ${b.isbn}`
@@ -133,7 +133,6 @@ export function Library() {
   const shown = filtered.slice((currentPage - 1) * 8, currentPage * 8);
   function navigate(v: View) {
     setView(v);
-    setMobile(false);
     setSearch("");
     setPage(1);
   }
@@ -167,86 +166,93 @@ export function Library() {
       : []),
   ];
   return (
-    <div
-      className={
-        "app-shell " +
-        (dark ? "dark " : "") +
-        (collapsed ? "sidebar-collapsed" : "")
-      }
-    >
-      {mobile && (
-        <button
-          className="sidebar-scrim"
-          aria-label="Fechar menu"
-          onClick={() => setMobile(false)}
-        />
-      )}
-      <LibrarySidebar
-        items={nav}
-        user={user}
-        view={view}
-        mobile={mobile}
-        collapsed={collapsed}
-        dark={dark}
-        demo={demo}
-        unreadCount={unreadCount}
-        onNavigate={navigate}
-        onCollapse={() => setCollapsed(!collapsed)}
-        onClose={() => setMobile(false)}
-        onTheme={() => setDark(!dark)}
-        onLogout={async () => {
-          try {
-            await service.logout();
-            state.client.clear();
-            navigate("catalog");
-          } catch (e) {
-            setNotice(errorMessage(e));
-          }
-        }}
-      />
+    <div className={"app-shell " + (dark ? "dark" : "")}>
       <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumb">
+        <header className="topbar topbar-tabs-layout">
+          <div className="topbar-row">
             <button
-              className="icon-button menu-button"
-              aria-label="Abrir menu"
-              onClick={() => setMobile(true)}
+              className="sidebar-brand topbar-brand"
+              aria-label="SIGB — explorar acervo"
+              onClick={() => navigate("catalog")}
             >
-              <Menu size={21} />
+              <Brand />
             </button>
-            <span>Biblioteca</span>
-            <ChevronRight size={13} />
-            <strong>{titles[view]}</strong>
-          </div>
-          <div className="top-actions">
-            <span className="campus">
-              <span />
-              Biblioteca universitária
-            </span>
-            <button
-              className="notification-button icon-button"
-              aria-label={`Abrir notificações${unreadCount ? `: ${unreadCount} ${unreadCount === 1 ? "não lida" : "não lidas"}` : ""}`}
-              onClick={() => navigate("notifications")}
-            >
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span className="topbar-unread-count">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
+            <div className="top-actions">
+              <button
+                className="icon-button"
+                aria-label={dark ? "Ativar tema claro" : "Ativar tema escuro"}
+                title={dark ? "Tema claro" : "Tema escuro"}
+                onClick={() => setDark(!dark)}
+              >
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                className="notification-button icon-button"
+                aria-label={`Abrir notificações${unreadCount ? `: ${unreadCount} ${unreadCount === 1 ? "não lida" : "não lidas"}` : ""}`}
+                onClick={() => navigate("notifications")}
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="topbar-unread-count">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+              <button
+                className={`avatar small-avatar ${view === "profile" ? "active" : ""}`}
+                onClick={() => navigate("profile")}
+                aria-label="Abrir meu perfil"
+                title="Meu perfil"
+              >
+                {user.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")}
+              </button>
+              {!demo && (
+                <button
+                  className="icon-button"
+                  aria-label="Sair da conta"
+                  title="Sair da conta"
+                  onClick={async () => {
+                    try {
+                      await service.logout();
+                      state.client.clear();
+                      navigate("catalog");
+                    } catch (e) {
+                      setNotice(errorMessage(e));
+                    }
+                  }}
+                >
+                  <LogOut size={18} />
+                </button>
               )}
-            </button>
-            <button
-              className="avatar small-avatar"
-              onClick={() => navigate("profile")}
-              aria-label="Abrir meu perfil"
-            >
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")}
-            </button>
+            </div>
           </div>
+          <nav className="top-tabs" aria-label="Navegação principal">
+            {nav.map(({ id, label }) => (
+              <button
+                key={id}
+                className={`top-tab ${view === id ? "active" : ""}`}
+                title={label}
+                aria-label={
+                  id === "notifications" && unreadCount
+                    ? `${label}: ${unreadCount} ${unreadCount === 1 ? "não lida" : "não lidas"}`
+                    : label
+                }
+                aria-current={view === id ? "page" : undefined}
+                onClick={() => navigate(id)}
+              >
+                <span>{label}</span>
+                {id === "notifications" && unreadCount > 0 && (
+                  <span className="nav-counter top-tab-counter">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
         </header>
         {demo && (
           <div className="demo-banner">
@@ -292,16 +298,24 @@ export function Library() {
                   </p>
                 </div>
                 {staff && (
-                  <button
-                    className="button primary"
-                    onClick={() => {
-                      setEditing(undefined);
-                      setBookForm(true);
-                    }}
-                  >
-                    <Plus size={17} />
-                    Cadastrar livro
-                  </button>
+                  <div className="catalog-actions">
+                    <button
+                      className="button secondary"
+                      onClick={() => setCategoryForm(true)}
+                    >
+                      Categorias
+                    </button>
+                    <button
+                      className="button primary"
+                      onClick={() => {
+                        setEditing(undefined);
+                        setBookForm(true);
+                      }}
+                    >
+                      <Plus size={17} />
+                      Cadastrar livro
+                    </button>
+                  </div>
                 )}
               </div>
               <section className="hero">
@@ -321,7 +335,7 @@ export function Library() {
                   </p>
                   <button
                     onClick={() => {
-                      setCategory("Todos os livros");
+                      setCategory(null);
                       setAvailability("available");
                       setPage(1);
                       document.getElementById("catalog")?.scrollIntoView({
@@ -438,24 +452,27 @@ export function Library() {
                 </div>
                 <div className="catalog-filters">
                   <div className="category-tabs">
-                    {categories
-                      .filter(
-                        (c) =>
-                          c !== "Tecnologia" ||
-                          books.some((b) => b.category === "Tecnologia"),
-                      )
-                      .map((c) => (
-                        <button
-                          className={category === c ? "selected" : ""}
-                          key={c}
-                          onClick={() => {
-                            setCategory(c);
-                            setPage(1);
-                          }}
-                        >
-                          {c}
-                        </button>
-                      ))}
+                    <button
+                      className={category === null ? "selected" : ""}
+                      onClick={() => {
+                        setCategory(null);
+                        setPage(1);
+                      }}
+                    >
+                      Todos os livros
+                    </button>
+                    {categories.map((c) => (
+                      <button
+                        className={category === c.name ? "selected" : ""}
+                        key={c.id}
+                        onClick={() => {
+                          setCategory(c.name);
+                          setPage(1);
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
                   </div>
                   <label className="availability-filter">
                     <SlidersHorizontal size={15} />
@@ -1022,7 +1039,7 @@ export function Library() {
                         "Livro indisponível. Faça uma nova busca no acervo.",
                       );
                       setAvailability("available");
-                      setCategory("Todos os livros");
+                      setCategory(null);
                       setSearch("");
                       return;
                     }
@@ -1037,7 +1054,7 @@ export function Library() {
                             setConfirm(null);
                             navigate("catalog");
                             setAvailability("available");
-                            setCategory("Todos os livros");
+                            setCategory(null);
                             void state.client.invalidateQueries({
                               queryKey: ["books"],
                             });
@@ -1096,6 +1113,19 @@ export function Library() {
           </div>
         </Modal>
       )}
+      {categoryForm && (
+        <Modal
+          title="Categorias do acervo"
+          message={notice}
+          onClose={() => setCategoryForm(false)}
+        >
+          <CategoryManager
+            categories={categories}
+            run={run}
+            pending={pending}
+          />
+        </Modal>
+      )}
       {bookForm && (
         <Modal
           message={notice}
@@ -1103,6 +1133,7 @@ export function Library() {
           onClose={() => setBookForm(false)}
         >
           <BookForm
+            categories={categories}
             book={editing}
             pending={pending}
             run={run}
