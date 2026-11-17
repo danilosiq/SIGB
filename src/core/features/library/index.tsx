@@ -39,6 +39,7 @@ import { libraryService as service } from "./services/library-service";
 import { roles } from "./data/demo";
 import { NotificationsPanel } from "./components/notifications-panel";
 import { OpenLibraryPanel } from "./components/open-library-panel";
+import { DeveloperPanel } from "./components/developer-panel";
 import { CategoryManager } from "./components/category-manager";
 import { BookForm } from "./components/book-form";
 import { UserForm } from "./components/user-form";
@@ -162,7 +163,14 @@ export function Library() {
     { id: "open-library" as View, label: "Biblioteca aberta", icon: Globe },
     { id: "notifications" as View, label: "Notificações", icon: Bell },
     ...(user.role === "ADMIN"
-      ? [{ id: "users" as View, label: "Usuários", icon: Users }]
+      ? [
+          { id: "users" as View, label: "Usuários", icon: Users },
+          {
+            id: "developer" as View,
+            label: "Área do desenvolvedor",
+            icon: Shield,
+          },
+        ]
       : []),
   ];
   return (
@@ -888,6 +896,13 @@ export function Library() {
             </>
           )}
           {view === "open-library" && <OpenLibraryPanel />}
+          {view === "developer" && user.role === "ADMIN" && (
+            <DeveloperPanel
+              run={run}
+              pending={pending}
+              onOpenNotifications={() => navigate("notifications")}
+            />
+          )}
           {view === "notifications" && (
             <NotificationsPanel
               notifications={notifications}

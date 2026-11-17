@@ -166,6 +166,54 @@ export async function handle(req: Request, segments: string[]) {
       return json({ id_notificacao: n.id, status: n.status }, 202);
     }
     const actor = await requireUser();
+    if (
+      resource === "developer" &&
+      id === "notifications" &&
+      method === "POST"
+    ) {
+      await requireUser(["ADMIN"]);
+      const { message } = z
+        .object({ message: z.string().trim().min(1).max(1000) })
+        .strict()
+        .parse(await req.json());
+      const notification = await db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id=${actor.id}::uuid FOR UPDATE`;
+        const recent = await tx.audit.count({
+          where: {
+            actorId: actor.id,
+            action: "NOTIFICACAO_TESTE_CRIADA",
+            createdAt: { gte: new Date(Date.now() - 60000) },
+          },
+        });
+        if (recent >= 5)
+          throw new HttpError(
+            429,
+            "Limite de 5 testes por minuto. Aguarde antes de tentar novamente.",
+          );
+        const created = await tx.notification.create({
+          data: {
+            eventKey: "developer:" + crypto.randomUUID(),
+            type: "TESTE_DESENVOLVEDOR",
+            message: "[TESTE] " + message,
+            status: "ENVIADA",
+            inbox: { create: { userId: actor.id } },
+          },
+        });
+        await tx.audit.create({
+          data: {
+            actorId: actor.id,
+            action: "NOTIFICACAO_TESTE_CRIADA",
+            entityId: created.id,
+            details: { simulated: true, externalDelivery: false },
+          },
+        });
+        return created;
+      });
+      return json(
+        { id: notification.id, status: notification.status, simulated: true },
+        201,
+      );
+    }
     if (resource === "categories") {
       if (method === "GET")
         return json(

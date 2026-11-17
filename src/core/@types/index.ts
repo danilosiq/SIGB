@@ -61,6 +61,7 @@ export type View =
   | "users"
   | "notifications"
   | "profile"
-  | "open-library";
+  | "open-library"
+  | "developer";
 
 export type Category = { id: string; name: string; _count?: { books: number } };

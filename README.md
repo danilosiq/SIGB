@@ -197,3 +197,9 @@ Validação adicional: testes de inbox em banco descartável cobrem atomicidade,
 ## Categorias cadastradas
 
 Administradores e bibliotecários cadastram categorias pelo botão **Categorias** do acervo ou por **Nova categoria** no formulário de livro. Alunos consultam e filtram pelas categorias registradas. `GET /api/categories` lista nomes e contagem de livros; `POST /api/categories` cadastra um nome único. Os livros possuem vínculo obrigatório com uma categoria cadastrada, protegido por chave estrangeira; categorias anteriores são migradas preservando o acervo. `GET /api/books?category=Literatura` filtra pelo nome registrado.
+
+## Área do desenvolvedor
+
+Aba exclusiva do administrador. `POST /api/developer/notifications` recebe `{ "message": "Mensagem de teste" }`, exige sessão administrativa e mesma origem, e cria aviso interno somente para o administrador autenticado. Retorna 201 com `id`, `status` e `simulated:true`. Mensagens entre 1 e 1000 caracteres; corpo desconhecido é rejeitado. Até cinco avisos por minuto por administrador (429), com auditoria e recibo persistidos atomicamente. Os avisos exibem TESTE e podem ser marcados como lidos. Não cria entregas externas nem aciona provedores ou workflows. Alunos/bibliotecários recebem 403; sem sessão, 401.
+
+As consultas públicas fazem no máximo duas tentativas para falhas temporárias e respeitam Retry-After dentro do orçamento da requisição. Respostas HTTP 200 inconsistentes são validadas: livros podem usar o catálogo sincronizado identificado; artigos podem usar o NCBI. Falha em ambas as fontes é exibida como indisponibilidade, sem inventar resultados. Buscas anteriores são canceladas ao trocar filtros e a navegação permite retornar após erro. Os limites externos continuam pertencendo aos provedores; a aplicação não realiza chamadas ilimitadas.

@@ -52,24 +52,54 @@ function safeGutenbergUrl(value: unknown): string | null {
   } catch {}
   return null;
 }
-async function sourceJson<T>(url: URL, timeout = 15_000): Promise<T> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "SIGB-Library/1.0 (https://sigb-three.vercel.app)",
-      },
-      signal: AbortSignal.timeout(timeout),
-      next: { revalidate: 1800 },
-    });
-    if (!response.ok) throw new Error("upstream");
-    return (await response.json()) as T;
-  } catch {
-    throw new HttpError(
-      502,
-      "A biblioteca pública está indisponível no momento. Tente novamente em instantes.",
-    );
+const sourceUnavailable = () =>
+  new HttpError(
+    502,
+    "A biblioteca pública está indisponível no momento. Tente novamente em instantes.",
+  );
+const validTotal = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const hasText = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+async function sourceJson<T>(url: URL, timeout = 12_000): Promise<T> {
+  // Two attempts share one provider budget; the article chain remains <=16s.
+  const deadline = Date.now() + timeout;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let delay = 250;
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "SIGB-Library/1.0 (https://sigb-three.vercel.app)",
+        },
+        signal: AbortSignal.timeout(
+          Math.max(1, Math.min(4500, deadline - Date.now())),
+        ),
+        cache: "force-cache",
+        next: { revalidate: 1800 },
+      });
+      if (response.ok) return (await response.json()) as T;
+      if (response.status !== 429 && response.status < 500)
+        throw sourceUnavailable();
+      const retryAfter = response.headers.get("retry-after");
+      if (retryAfter !== null) {
+        const seconds = Number(retryAfter);
+        delay = Number.isFinite(seconds)
+          ? Math.max(0, seconds * 1000)
+          : Math.max(0, Date.parse(retryAfter) - Date.now());
+        if (!Number.isFinite(delay)) delay = 250;
+      }
+      await response.body?.cancel();
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+    }
+    // Do not ignore a provider's long Retry-After or wait past the UI deadline.
+    if (attempt === 1 || delay > 500 || deadline - Date.now() <= delay + 100)
+      break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
+  throw sourceUnavailable();
 }
 function syncedBooks(query: string, page: number): OpenLibraryResult {
   const normalize = (value: string) =>
@@ -130,50 +160,63 @@ export async function searchOpenLibrary(
     url.searchParams.set("copyright", "false");
     url.searchParams.set("page", String(page));
     if (query) url.searchParams.set("search", query);
-    let data: { count: number; next: string | null; results: GutenbergBook[] };
     try {
-      data = await sourceJson<typeof data>(url);
+      const data = await sourceJson<{
+        count: number;
+        next: string | null;
+        results: GutenbergBook[];
+      }>(url);
+      if (!data || !validTotal(data.count) || !Array.isArray(data.results))
+        throw new HttpError(502, "Resposta inválida da biblioteca pública.");
+      const items = data.results
+        .filter(
+          (b) =>
+            b &&
+            Number.isSafeInteger(b.id) &&
+            b.id > 0 &&
+            b.copyright === false &&
+            hasText(b.title),
+        )
+        .map((book) => {
+          const formats = book.formats ?? {};
+          const readingUrl = Object.entries(formats)
+            .filter(([mime]) => mime.startsWith("text/html"))
+            .map(([, value]) => safeGutenbergUrl(value))
+            .find(Boolean);
+          return {
+            id: "gutenberg:" + book.id,
+            kind: "books" as const,
+            title: book.title,
+            authors:
+              (Array.isArray(book.authors) ? book.authors : [])
+                .filter((a) => a && hasText(a.name))
+                .map((a) => a.name.split(", ").reverse().join(" "))
+                .join(" · ") || "Autoria não informada",
+            summary:
+              (Array.isArray(book.summaries) && hasText(book.summaries[0])
+                ? book.summaries[0].slice(0, 1000)
+                : null) ||
+              "Edição digital em português disponibilizada pelo Project Gutenberg. Consulte a obra e as condições de uso na fonte.",
+            url: readingUrl || "https://www.gutenberg.org/ebooks/" + book.id,
+            coverUrl: safeGutenbergUrl(formats["image/jpeg"]),
+            year: null,
+            source: "Project Gutenberg",
+          };
+        });
+      if (!items.length && data.count > (page - 1) * 32)
+        throw sourceUnavailable();
+      return {
+        kind,
+        query,
+        page,
+        total: data.count,
+        hasNext: page < 100 && !!data.next,
+        source: "Gutendex / Project Gutenberg",
+        items,
+      };
     } catch {
       return syncedBooks(query, page);
     }
-    if (!Array.isArray(data.results))
-      throw new HttpError(502, "Resposta inválida da biblioteca pública.");
-    const items = data.results
-      .filter(
-        (b) => Number.isSafeInteger(b.id) && b.id > 0 && b.copyright === false,
-      )
-      .map((book) => {
-        const formats = book.formats ?? {};
-        const readingUrl = Object.entries(formats)
-          .filter(([mime]) => mime.startsWith("text/html"))
-          .map(([, value]) => safeGutenbergUrl(value))
-          .find(Boolean);
-        return {
-          id: "gutenberg:" + book.id,
-          kind: "books" as const,
-          title: book.title,
-          authors:
-            book.authors
-              ?.map((a) => a.name.split(", ").reverse().join(" "))
-              .join(" · ") || "Autoria não informada",
-          summary:
-            book.summaries?.[0]?.slice(0, 1000) ||
-            "Edição digital em português disponibilizada pelo Project Gutenberg. Consulte a obra e as condições de uso na fonte.",
-          url: readingUrl || "https://www.gutenberg.org/ebooks/" + book.id,
-          coverUrl: safeGutenbergUrl(formats["image/jpeg"]),
-          year: null,
-          source: "Project Gutenberg",
-        };
-      });
-    return {
-      kind,
-      query,
-      page,
-      total: data.count ?? items.length,
-      hasNext: !!data.next,
-      source: "Gutendex / Project Gutenberg",
-      items,
-    };
   }
 
   try {
@@ -203,33 +246,44 @@ async function europeArticles(
     hitCount: number;
     resultList?: { result?: Article[] };
   }>(url, 6_000);
-  const rows = data.resultList?.result;
-  if (!Array.isArray(rows))
+  const rows = data?.resultList?.result;
+  if (!data || !validTotal(data.hitCount) || !Array.isArray(rows))
     throw new HttpError(502, "Resposta inválida da base de artigos.");
   const items = rows
-    .filter((a) => a.isOpenAccess === "Y" && a.id && a.source)
+    .filter(
+      (a) =>
+        a &&
+        a.isOpenAccess === "Y" &&
+        hasText(a.id) &&
+        hasText(a.source) &&
+        hasText(a.title),
+    )
     .map((article) => ({
       id: `epmc:${article.source}:${article.id}`,
       kind: "articles" as const,
       title: article.title,
-      authors: article.authorString || "Autoria não informada",
-      summary: article.journalTitle
+      authors: hasText(article.authorString)
+        ? article.authorString
+        : "Autoria não informada",
+      summary: hasText(article.journalTitle)
         ? `Publicado em ${article.journalTitle}. Artigo com acesso aberto; consulte o texto e a licença na fonte.`
         : "Artigo com acesso aberto. Consulte o texto e a licença na fonte.",
       url: `https://europepmc.org/article/${encodeURIComponent(article.source)}/${encodeURIComponent(article.id)}`,
       coverUrl: null,
       year:
-        article.pubYear && /^\d{4}$/.test(article.pubYear)
+        hasText(article.pubYear) && /^\d{4}$/.test(article.pubYear)
           ? Number(article.pubYear)
           : null,
       source: "Europe PMC",
     }));
+  if (!items.length && data.hitCount > (page - 1) * 20)
+    throw sourceUnavailable();
   return {
     kind,
     query,
     page,
-    total: data.hitCount ?? items.length,
-    hasNext: page * 20 < data.hitCount,
+    total: data.hitCount,
+    hasNext: page < 100 && page * 20 < data.hitCount,
     source: "Europe PMC",
     items,
   };
@@ -266,7 +320,7 @@ async function pmcArticles(
   const search = await sourceJson<{
     esearchresult?: { count?: string; idlist?: string[] };
   }>(searchUrl, 5_000);
-  const found = search.esearchresult;
+  const found = search?.esearchresult;
   if (
     !found ||
     typeof found.count !== "string" ||
@@ -283,12 +337,14 @@ async function pmcArticles(
   if (ids.length !== found.idlist.length)
     throw new HttpError(502, "Resposta inválida da base de artigos.");
   const total = Number(found.count);
+  if (!validTotal(total) || (!ids.length && total > (page - 1) * 20))
+    throw sourceUnavailable();
   const result: OpenLibraryResult = {
     kind: "articles",
     query,
     page,
     total,
-    hasNext: page * 20 < total,
+    hasNext: page < 100 && page * 20 < total,
     source: "NCBI PubMed Central · fonte alternativa",
     items: [],
   };
@@ -306,16 +362,20 @@ async function pmcArticles(
     summaryUrl,
     5_000,
   );
-  if (!data.result)
+  if (!data?.result)
     throw new HttpError(502, "Resposta inválida da base de artigos.");
   result.items = ids.flatMap((id) => {
     const article = data.result?.[id];
-    if (!article || typeof article.title !== "string") return [];
+    if (!article || !hasText(article.title)) return [];
     const year =
       typeof article.pubdate === "string"
         ? article.pubdate.match(/^\d{4}/)?.[0]
         : null;
-    const journal = article.fulljournalname || article.source;
+    const journal = hasText(article.fulljournalname)
+      ? article.fulljournalname
+      : hasText(article.source)
+        ? article.source
+        : null;
     return [
       {
         id: `pmc:${id}`,
@@ -323,6 +383,7 @@ async function pmcArticles(
         title: article.title.replace(/<[^>]*>/g, ""),
         authors: Array.isArray(article.authors)
           ? article.authors
+              .filter((a) => a && hasText(a.name))
               .map((a) => a.name)
               .filter((a) => typeof a === "string")
               .join(", ") || "Autoria não informada"

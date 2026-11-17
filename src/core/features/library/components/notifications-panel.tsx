@@ -6,6 +6,7 @@ import type { Notification } from "@/core/@types";
 import { PageTitle, Empty } from "./library-shared";
 import { notificationService } from "../services/notification-service";
 const titles: Record<string, string> = {
+  TESTE_DESENVOLVEDOR: "Teste de notificação",
   PRAZO_PROXIMO: "Devolução próxima",
   BLOQUEIO_POR_ATRASO: "Bloqueio por atraso",
   EMPRESTIMO_CONFIRMADO: "Empréstimo confirmado",
@@ -90,11 +91,13 @@ export function NotificationsPanel({
                 <details className="notification-delivery">
                   <summary>
                     Detalhes do envio externo ·{" "}
-                    {n.status === "ENVIADA"
-                      ? "Enviado"
-                      : n.status === "FALHA"
-                        ? "Falha"
-                        : "Processando"}
+                    {!n.deliveries.length
+                      ? "Aviso interno · sem envio externo"
+                      : n.status === "ENVIADA"
+                        ? "Enviado"
+                        : n.status === "FALHA"
+                          ? "Falha"
+                          : "Processando"}
                   </summary>
                   {n.deliveries.length ? (
                     n.deliveries.map((d) => (

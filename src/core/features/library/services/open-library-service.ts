@@ -21,10 +21,16 @@ export type OpenLibraryResult = {
   items: OpenLibraryItem[];
 };
 export const openLibraryService = {
-  search: async (kind: "books" | "articles", search: string, page: number) =>
+  search: async (
+    kind: "books" | "articles",
+    search: string,
+    page: number,
+    signal?: AbortSignal,
+  ) =>
     (
       await api.get<OpenLibraryResult>("/open-library", {
         params: { kind, search, page },
+        signal,
       })
     ).data,
 };

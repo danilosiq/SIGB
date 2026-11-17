@@ -109,6 +109,95 @@ const student = await login(input.email, password);
 const otherData = { ...input, email: "other-" + suffix + "@test.local" };
 assert.equal((await call("/api/users", "POST", otherData, admin)).status, 201);
 const other = await login(otherData.email, password);
+assert.equal(
+  (
+    await call(
+      "/api/developer/notifications",
+      "POST",
+      { message: "Teste" },
+      student,
+    )
+  ).status,
+  403,
+);
+assert.equal(
+  (await call("/api/developer/notifications", "POST", { message: "Teste" }))
+    .status,
+  401,
+);
+assert.equal(
+  (await call("/api/developer/notifications", "POST", { message: " " }, admin))
+    .status,
+  400,
+);
+const simulated = await call(
+  "/api/developer/notifications",
+  "POST",
+  { message: "Aviso de teste " + suffix },
+  admin,
+);
+assert.equal(simulated.status, 201, JSON.stringify(simulated.data));
+assert.equal(simulated.data.simulated, true);
+assert.equal(
+  (
+    await call(
+      "/api/developer/notifications",
+      "POST",
+      { message: "Teste", recipientIds: [created.data.id] },
+      admin,
+    )
+  ).status,
+  400,
+);
+for (let i = 0; i < 4; i++)
+  assert.equal(
+    (
+      await call(
+        "/api/developer/notifications",
+        "POST",
+        { message: "Limite de testes " + i },
+        admin,
+      )
+    ).status,
+    201,
+  );
+assert.equal(
+  (
+    await call(
+      "/api/developer/notifications",
+      "POST",
+      { message: "Sexto teste" },
+      admin,
+    )
+  ).status,
+  429,
+);
+const developerInbox = (
+  await call("/api/notificacoes", "GET", undefined, admin)
+).data;
+const testNotice = developerInbox.find((n) => n.id === simulated.data.id);
+assert.ok(testNotice);
+assert.equal(testNotice.readAt, null);
+assert.equal(testNotice.deliveries.length, 0);
+assert.ok(testNotice.message.startsWith("[TESTE]"));
+assert.equal(
+  (await call("/api/notificacoes", "GET", undefined, other)).data.some(
+    (n) => n.id === simulated.data.id,
+  ),
+  false,
+);
+assert.equal(
+  (
+    await call(
+      "/api/notificacoes/" + simulated.data.id + "/read",
+      "PATCH",
+      undefined,
+      admin,
+    )
+  ).status,
+  200,
+);
+
 const staffData = {
   ...input,
   role: "BIBLIOTECARIO",

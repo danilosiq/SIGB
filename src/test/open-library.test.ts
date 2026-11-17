@@ -101,7 +101,12 @@ describe("public library sources", () => {
   it("falls back to live NCBI OA metadata with explicit attribution and safe article URLs", async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response("unavailable", {
+          status: 503,
+          headers: { "Retry-After": "120" },
+        }),
+      )
       .mockResolvedValueOnce(
         Response.json({ esearchresult: { count: "61", idlist: ["13724522"] } }),
       )
@@ -146,7 +151,12 @@ describe("public library sources", () => {
   it("does not request summaries for an empty NCBI result", async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(new Response("outage", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response("outage", {
+          status: 503,
+          headers: { "Retry-After": "120" },
+        }),
+      )
       .mockResolvedValueOnce(
         Response.json({ esearchresult: { count: "0", idlist: [] } }),
       );
@@ -161,7 +171,12 @@ describe("public library sources", () => {
   it("rejects malformed NCBI identifiers before summary retrieval", async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(new Response("outage", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response("outage", {
+          status: 503,
+          headers: { "Retry-After": "120" },
+        }),
+      )
       .mockResolvedValueOnce(
         Response.json({
           esearchresult: { count: "1", idlist: ["../../untrusted"] },
@@ -181,5 +196,135 @@ describe("public library sources", () => {
     await expect(
       searchOpenLibrary(new URLSearchParams("kind=articles")),
     ).rejects.toThrow("A biblioteca pública está indisponível no momento.");
+  });
+  it("falls back instead of reporting a malformed successful book response as a normal failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json({ count: 12, results: [] })),
+    );
+    const result = await searchOpenLibrary(new URLSearchParams("kind=books"));
+    expect(result.degraded).toBe(true);
+    expect(result.items.length).toBeGreaterThan(0);
+  });
+  it("uses the secondary article source when the primary claims matches but returns an empty page", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ hitCount: 5, resultList: { result: [] } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ esearchresult: { count: "0", idlist: [] } }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await searchOpenLibrary(
+      new URLSearchParams("kind=articles"),
+    );
+    expect(result.source).toContain("NCBI");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("rejects an inconsistent empty secondary result rather than presenting no matches", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response("bad request", { status: 400 }))
+        .mockResolvedValueOnce(
+          Response.json({ esearchresult: { count: "5", idlist: [] } }),
+        ),
+    );
+    await expect(
+      searchOpenLibrary(new URLSearchParams("kind=articles")),
+    ).rejects.toThrow();
+  });
+  it("recovers a transient rate limit with a bounded retry of the same provider", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("slow down", {
+          status: 429,
+          headers: { "Retry-After": "0" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ hitCount: 0, resultList: { result: [] } }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await searchOpenLibrary(
+      new URLSearchParams("kind=articles"),
+    );
+    expect(result.source).toBe("Europe PMC");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0][0])).toBe(String(fetch.mock.calls[1][0]));
+  });
+  it("never advertises a next page beyond the supported page limit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({
+            hitCount: 99999,
+            resultList: {
+              result: [
+                { id: "123", source: "MED", title: "Study", isOpenAccess: "Y" },
+              ],
+            },
+          }),
+        ),
+    );
+    const result = await searchOpenLibrary(
+      new URLSearchParams("kind=articles&page=100"),
+    );
+    expect(result.hasNext).toBe(false);
+  });
+
+  it("limits repeated provider failures to two attempts before using the synced books", async () => {
+    const fetch = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(new Response("outage", { status: 503 })),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await searchOpenLibrary(new URLSearchParams("kind=books"));
+    expect(result.degraded).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("keeps a genuine zero-result search distinguishable from provider failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ count: 0, next: null, results: [] }),
+        ),
+    );
+    const result = await searchOpenLibrary(
+      new URLSearchParams("kind=books&search=notfound"),
+    );
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
+    expect(result.degraded).not.toBe(true);
+  });
+  it("does not expose malformed mandatory article metadata as a successful card", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          hitCount: 1,
+          resultList: {
+            result: [
+              { id: "123", source: "MED", title: null, isOpenAccess: "Y" },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ esearchresult: { count: "0", idlist: [] } }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await searchOpenLibrary(
+      new URLSearchParams("kind=articles"),
+    );
+    expect(result.source).toContain("NCBI");
   });
 });

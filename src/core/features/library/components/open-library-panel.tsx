@@ -22,9 +22,10 @@ export function OpenLibraryPanel() {
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ["open-library", kind, search, page],
-    queryFn: () => openLibraryService.search(kind, search, page),
-    staleTime: 30 * 60_000,
-    retry: 1,
+    queryFn: ({ signal }) =>
+      openLibraryService.search(kind, search, page, signal),
+    staleTime: (query) => (query.state.data?.degraded ? 60_000 : 30 * 60_000),
+    retry: false,
   });
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -114,7 +115,11 @@ export function OpenLibraryPanel() {
         <div className={styles.state}>
           <Search size={30} />
           <h2>Nenhum resultado encontrado</h2>
-          <p>Tente outro título, autor ou tema.</p>
+          <p>
+            {page > 1
+              ? "Não há itens nesta página. Volte à página anterior ou faça outra busca."
+              : "Tente outro título, autor ou tema."}
+          </p>
         </div>
       ) : (
         <>
@@ -154,47 +159,65 @@ export function OpenLibraryPanel() {
               </article>
             ))}
           </div>
-          <nav
-            className={styles.pagination}
-            aria-label="Páginas da biblioteca aberta"
-          >
-            <button
-              disabled={page === 1 || query.isFetching}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft size={16} />
-              Anterior
-            </button>
-            <span>Página {page}</span>
-            <button
-              disabled={!query.data.hasNext || query.isFetching}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Próxima
-              <ChevronRight size={16} />
-            </button>
-          </nav>
         </>
+      )}
+      {(page > 1 || query.data?.hasNext) && (
+        <nav
+          className={styles.pagination}
+          aria-label="Páginas da biblioteca aberta"
+        >
+          <button
+            disabled={page === 1 || query.isFetching}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            <ChevronLeft size={16} />
+            Anterior
+          </button>
+          <span>Página {page}</span>
+          <button
+            disabled={!query.data?.hasNext || query.isFetching}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Próxima
+            <ChevronRight size={16} />
+          </button>
+        </nav>
       )}
       <footer className={styles.attribution}>
         <span>Fonte dos dados:</span>
         {kind === "books" ? (
           <span>
-            <a href="https://gutendex.com/" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://gutendex.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Gutendex
             </a>
             {" · "}
-            <a href="https://www.gutenberg.org/" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://www.gutenberg.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Project Gutenberg
             </a>
           </span>
         ) : (
           <span>
-            <a href="https://europepmc.org/" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://europepmc.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Europe PMC
             </a>
             {" · "}
-            <a href="https://pmc.ncbi.nlm.nih.gov/" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://pmc.ncbi.nlm.nih.gov/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               PubMed Central
             </a>
           </span>
