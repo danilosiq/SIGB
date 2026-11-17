@@ -20,6 +20,7 @@ export type OpenLibraryResult = {
   hasNext: boolean;
   source: string;
   degraded?: boolean;
+  nextCursor?: string;
   items: OpenLibraryItem[];
 };
 type GutenbergBook = {
@@ -150,6 +151,14 @@ export async function searchOpenLibrary(
   if (!/^\d{1,3}$/.test(rawPage)) throw new HttpError(400, "Página inválida.");
   const page = Number(rawPage);
   if (page < 1 || page > 100) throw new HttpError(400, "Página inválida.");
+  const cursor = params.get("cursor") ?? undefined;
+  if (
+    cursor !== undefined &&
+    (!/^[\x21-\x7e]{1,2048}$/.test(cursor) ||
+      (page > 1 && cursor === "*") ||
+      (cursor.startsWith("ncbi:") && cursor !== `ncbi:${(page - 1) * 20}`))
+  )
+    throw new HttpError(400, "Cursor de paginação inválido. Refaça a busca.");
   const query = (params.get("search") ?? "").trim();
   if (query.length > 160)
     throw new HttpError(400, "A busca deve ter no máximo 160 caracteres.");
@@ -219,8 +228,10 @@ export async function searchOpenLibrary(
     }
   }
 
+  if (cursor?.startsWith("ncbi:") || (page > 1 && !cursor))
+    return pmcArticles(query, page);
   try {
-    return await europeArticles(query, page);
+    return await europeArticles(query, page, cursor ?? "*");
   } catch {
     return await pmcArticles(query, page);
   }
@@ -229,6 +240,7 @@ export async function searchOpenLibrary(
 async function europeArticles(
   query: string,
   page: number,
+  cursor: string,
 ): Promise<OpenLibraryResult> {
   const kind = "articles";
   const url = new URL(
@@ -241,9 +253,10 @@ async function europeArticles(
   );
   url.searchParams.set("format", "json");
   url.searchParams.set("pageSize", "20");
-  url.searchParams.set("page", String(page));
+  url.searchParams.set("cursorMark", cursor);
   const data = await sourceJson<{
     hitCount: number;
+    nextCursorMark?: string;
     resultList?: { result?: Article[] };
   }>(url, 6_000);
   const rows = data?.resultList?.result;
@@ -278,12 +291,20 @@ async function europeArticles(
     }));
   if (!items.length && data.hitCount > (page - 1) * 20)
     throw sourceUnavailable();
+  const nextCursor =
+    typeof data.nextCursorMark === "string" &&
+    /^[\x21-\x7e]{1,2048}$/.test(data.nextCursorMark) &&
+    data.nextCursorMark !== cursor
+      ? data.nextCursorMark
+      : undefined;
+  const hasNext = page < 100 && page * 20 < data.hitCount && !!nextCursor;
   return {
     kind,
     query,
     page,
     total: data.hitCount,
-    hasNext: page < 100 && page * 20 < data.hitCount,
+    hasNext,
+    ...(hasNext ? { nextCursor } : {}),
     source: "Europe PMC",
     items,
   };
@@ -345,6 +366,9 @@ async function pmcArticles(
     page,
     total,
     hasNext: page < 100 && page * 20 < total,
+    ...(page < 100 && page * 20 < total
+      ? { nextCursor: `ncbi:${page * 20}` }
+      : {}),
     source: "NCBI PubMed Central · fonte alternativa",
     items: [],
   };

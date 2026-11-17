@@ -47,6 +47,7 @@ describe("public library sources", () => {
     const fetch = vi.fn().mockResolvedValue(
       Response.json({
         hitCount: 60,
+        nextCursorMark: "cursor-two",
         resultList: {
           result: [
             {
@@ -67,6 +68,7 @@ describe("public library sources", () => {
         kind: "articles",
         search: 'education" OR X:Y',
         page: "2",
+        cursor: "cursor-one",
       }),
     );
     const url = fetch.mock.calls[0][0] as URL;
@@ -74,7 +76,9 @@ describe("public library sources", () => {
     expect(url.searchParams.get("query")).toBe(
       'OPEN_ACCESS:Y AND "education  OR X:Y"',
     );
-    expect(url.searchParams.get("page")).toBe("2");
+    expect(url.searchParams.has("page")).toBe(false);
+    expect(url.searchParams.get("cursorMark")).toBe("cursor-one");
+    expect(result.nextCursor).toBe("cursor-two");
     expect(url.searchParams.has("sort")).toBe(false);
     expect(url.searchParams.get("pageSize")).toBe("20");
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -128,6 +132,7 @@ describe("public library sources", () => {
         kind: "articles",
         search: 'education"[Other]',
         page: "3",
+        cursor: "cursor-page3",
       }),
     );
     const searchUrl = fetch.mock.calls[1][0] as URL;
@@ -259,21 +264,19 @@ describe("public library sources", () => {
   it("never advertises a next page beyond the supported page limit", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({
-            hitCount: 99999,
-            resultList: {
-              result: [
-                { id: "123", source: "MED", title: "Study", isOpenAccess: "Y" },
-              ],
-            },
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        Response.json({
+          hitCount: 99999,
+          resultList: {
+            result: [
+              { id: "123", source: "MED", title: "Study", isOpenAccess: "Y" },
+            ],
+          },
+        }),
+      ),
     );
     const result = await searchOpenLibrary(
-      new URLSearchParams("kind=articles&page=100"),
+      new URLSearchParams("kind=articles&page=100&cursor=cursor-page100"),
     );
     expect(result.hasNext).toBe(false);
   });
@@ -324,6 +327,78 @@ describe("public library sources", () => {
     vi.stubGlobal("fetch", fetch);
     const result = await searchOpenLibrary(
       new URLSearchParams("kind=articles"),
+    );
+    expect(result.source).toContain("NCBI");
+  });
+  it("uses the cursor returned by Europe PMC rather than repeating the first page", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          hitCount: 41,
+          nextCursorMark: "cursor-page2",
+          resultList: {
+            result: [
+              { id: "111", source: "MED", title: "First", isOpenAccess: "Y" },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          hitCount: 41,
+          nextCursorMark: "cursor-page3",
+          resultList: {
+            result: [
+              { id: "222", source: "MED", title: "Second", isOpenAccess: "Y" },
+            ],
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const first = await searchOpenLibrary(new URLSearchParams("kind=articles"));
+    const second = await searchOpenLibrary(
+      new URLSearchParams({
+        kind: "articles",
+        page: "2",
+        cursor: first.nextCursor!,
+      }),
+    );
+    expect((fetch.mock.calls[0][0] as URL).searchParams.get("cursorMark")).toBe(
+      "*",
+    );
+    expect((fetch.mock.calls[1][0] as URL).searchParams.get("cursorMark")).toBe(
+      "cursor-page2",
+    );
+    expect(second.items[0].id).not.toBe(first.items[0].id);
+  });
+  it("rejects invalid or oversized cursors before contacting a provider", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    for (const cursor of [" ", "x".repeat(2049), "*"]) {
+      await expect(
+        searchOpenLibrary(
+          new URLSearchParams({ kind: "articles", page: "2", cursor }),
+        ),
+      ).rejects.toThrow("Cursor");
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("keeps subsequent NCBI pages on their source and uses the correct offset", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ esearchresult: { count: "0", idlist: [] } }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const result = await searchOpenLibrary(
+      new URLSearchParams({ kind: "articles", page: "2", cursor: "ncbi:20" }),
+    );
+    expect((fetch.mock.calls[0][0] as URL).hostname).toBe(
+      "eutils.ncbi.nlm.nih.gov",
+    );
+    expect((fetch.mock.calls[0][0] as URL).searchParams.get("retstart")).toBe(
+      "20",
     );
     expect(result.source).toContain("NCBI");
   });

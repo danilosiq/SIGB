@@ -20,10 +20,12 @@ export function OpenLibraryPanel() {
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<Record<number, string>>({});
+  const cursor = kind === "articles" ? cursors[page] : undefined;
   const query = useQuery({
-    queryKey: ["open-library", kind, search, page],
+    queryKey: ["open-library", kind, search, page, cursor],
     queryFn: ({ signal }) =>
-      openLibraryService.search(kind, search, page, signal),
+      openLibraryService.search(kind, search, page, signal, cursor),
     staleTime: (query) => (query.state.data?.degraded ? 60_000 : 30 * 60_000),
     retry: false,
   });
@@ -31,10 +33,12 @@ export function OpenLibraryPanel() {
     e.preventDefault();
     setSearch(draft.trim());
     setPage(1);
+    setCursors({});
   }
   function changeKind(next: "books" | "articles") {
     setKind(next);
     setPage(1);
+    setCursors({});
   }
   return (
     <section className={styles.library}>
@@ -176,7 +180,14 @@ export function OpenLibraryPanel() {
           <span>Página {page}</span>
           <button
             disabled={!query.data?.hasNext || query.isFetching}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => {
+              if (kind === "articles" && query.data?.nextCursor)
+                setCursors((previous) => ({
+                  ...previous,
+                  [page + 1]: query.data!.nextCursor!,
+                }));
+              setPage((p) => p + 1);
+            }}
           >
             Próxima
             <ChevronRight size={16} />

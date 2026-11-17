@@ -18,6 +18,7 @@ export type OpenLibraryResult = {
   hasNext: boolean;
   source: string;
   degraded?: boolean;
+  nextCursor?: string;
   items: OpenLibraryItem[];
 };
 export const openLibraryService = {
@@ -26,10 +27,11 @@ export const openLibraryService = {
     search: string,
     page: number,
     signal?: AbortSignal,
+    cursor?: string,
   ) =>
     (
       await api.get<OpenLibraryResult>("/open-library", {
-        params: { kind, search, page },
+        params: { kind, search, page, cursor },
         signal,
       })
     ).data,
